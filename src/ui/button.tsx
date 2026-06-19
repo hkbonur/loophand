@@ -16,11 +16,11 @@ interface Props {
 }
 
 const VARIANT_CLASSES: Record<Variant, string> = {
-  primary: "bg-[var(--lagoon-deep)] text-white hover:bg-[var(--lagoon)]",
+  primary: "bg-primary text-primary-foreground hover:bg-primary/90",
   secondary:
-    "border border-[var(--line)] bg-[var(--surface)] text-[var(--sea-ink)] hover:bg-[var(--surface-strong)]",
-  ghost: "text-[var(--sea-ink-soft)] hover:bg-[var(--surface)] hover:text-[var(--sea-ink)]",
-  danger: "bg-[#c0463c] text-white hover:bg-[#a93a31]",
+    "border border-border bg-secondary text-secondary-foreground hover:bg-card",
+  ghost: "text-muted-foreground hover:bg-muted hover:text-foreground",
+  danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
 };
 
 const SIZE_CLASSES: Record<Size, string> = {
@@ -38,7 +38,7 @@ export function Button(props: Props) {
       title={props.title}
       onClick={props.onClick}
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 rounded-full font-semibold transition",
+        "inline-flex items-center justify-center gap-1.5 rounded-full font-semibold leading-none transition",
         "disabled:pointer-events-none disabled:opacity-50",
         VARIANT_CLASSES[variant],
         SIZE_CLASSES[size],

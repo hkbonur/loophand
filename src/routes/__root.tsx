@@ -14,7 +14,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { name: "theme-color", content: "#328f97" },
+      { name: "theme-color", content: "#111111" },
       { title: "loophand" },
     ],
     links: [
@@ -32,7 +32,7 @@ function RootDocument(props: { children: React.ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />
       </head>
-      <body className="min-h-screen bg-[var(--bg-base)] font-sans antialiased [overflow-wrap:anywhere] selection:bg-[rgba(79,184,178,0.24)]">
+      <body className="min-h-screen bg-background font-sans antialiased [overflow-wrap:anywhere] selection:bg-foreground/15">
         <ConvexAuthProvider>
           <div className="fixed right-4 top-4 z-40">
             <ThemeToggle />

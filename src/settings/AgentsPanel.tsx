@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
-import { ArrowLeft, KeyRound, Trash2 } from "lucide-react";
+import { ArrowLeft, Key, Trash } from "@phosphor-icons/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Button } from "../ui/button";
@@ -49,40 +49,40 @@ export function AgentsPanel() {
     <main className="mx-auto w-full max-w-3xl px-4 py-8">
       <Link
         to="/"
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-[var(--sea-ink-soft)] no-underline hover:text-[var(--sea-ink)]"
+        className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground no-underline hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to board
       </Link>
 
-      <h1 className="mb-1 text-2xl font-bold text-[var(--sea-ink)]">Agents</h1>
-      <p className="mb-6 text-sm text-[var(--sea-ink-soft)]">
+      <h1 className="mb-1 text-2xl font-bold text-foreground">Agents</h1>
+      <p className="mb-6 text-sm text-muted-foreground">
         Mint an API key, then drop it into your agent's <code>.mcp.json</code>. Keys carry full task
         access.
       </p>
 
-      <section className="mb-8 rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-5">
+      <section className="mb-8 rounded-3xl border border-border bg-muted p-5">
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex-1">
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--sea-ink-soft)]">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Key name
             </label>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="e.g. laptop / claude-code"
-              className="h-10 w-full rounded-full border border-[var(--line)] bg-[var(--surface-strong)] px-4 text-sm text-[var(--sea-ink)] focus:border-[var(--lagoon-deep)] focus:outline-none"
+              className="h-10 w-full rounded-full border border-border bg-card px-4 text-sm text-foreground focus:border-primary focus:outline-none"
             />
           </div>
           <Button disabled={minting} onClick={mint}>
-            {minting ? <Spinner className="text-white" /> : <KeyRound className="h-4 w-4" />}
+            {minting ? <Spinner className="text-white" /> : <Key className="h-4 w-4" />}
             Mint key
           </Button>
         </div>
 
         {freshKey ? (
           <div className="mt-4">
-            <p className="mb-2 text-sm font-medium text-[var(--sea-ink)]">
+            <p className="mb-2 text-sm font-medium text-foreground">
               Your new key (shown once):
             </p>
             <ConnectSnippet apiKey={freshKey} />
@@ -90,7 +90,7 @@ export function AgentsPanel() {
         ) : null}
       </section>
 
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--sea-ink-soft)]">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         Existing keys
       </h2>
       {tokens === undefined ? (
@@ -102,18 +102,18 @@ export function AgentsPanel() {
           {tokens.map((token) => (
             <li
               key={token._id}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] px-4 py-3"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3"
             >
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-[var(--sea-ink)]">{token.name}</p>
-                <p className="font-mono text-xs text-[var(--sea-ink-soft)]">{token.tokenPrefix}…</p>
+                <p className="truncate text-sm font-semibold text-foreground">{token.name}</p>
+                <p className="font-mono text-xs text-muted-foreground">{token.tokenPrefix}…</p>
               </div>
               <div className="flex items-center gap-2">
                 {token.isRevoked ? (
                   <Badge tone="danger">Revoked</Badge>
                 ) : (
                   <Button variant="ghost" size="sm" onClick={() => revoke(token._id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash className="h-3.5 w-3.5" />
                     Revoke
                   </Button>
                 )}

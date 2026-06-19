@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { CircleNotch } from "@phosphor-icons/react";
 import { cn } from "../lib/cn";
 
 interface Props {
@@ -7,6 +7,6 @@ interface Props {
 
 export function Spinner(props: Props) {
   return (
-    <Loader2 className={cn("h-4 w-4 animate-spin text-[var(--sea-ink-soft)]", props.className)} />
+    <CircleNotch weight="bold" className={cn("h-4 w-4 animate-spin", props.className)} />
   );
 }

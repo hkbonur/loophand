@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
-import { Settings } from "lucide-react";
+import { Gear } from "@phosphor-icons/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Spinner } from "../ui/spinner";
@@ -15,7 +15,7 @@ import { toast } from "../ui/toaster";
 
 function CenteredSpinner(props: { label: string }) {
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-sm text-[var(--sea-ink-soft)]">
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
       <Spinner />
       {props.label}
     </div>
@@ -81,13 +81,13 @@ function BoardInner() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="island-kicker mb-1">loophand</p>
-          <h1 className="text-2xl font-bold text-[var(--sea-ink)]">Board</h1>
+          <h1 className="text-2xl font-bold text-foreground">Board</h1>
         </div>
         <Link
           to="/settings/agents"
-          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-sm font-semibold text-[var(--sea-ink)] no-underline transition hover:bg-[var(--surface-strong)]"
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground no-underline transition hover:bg-card"
         >
-          <Settings className="h-4 w-4" />
+          <Gear className="h-4 w-4" />
           Agents
         </Link>
       </div>

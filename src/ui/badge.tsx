@@ -10,11 +10,11 @@ interface Props {
 }
 
 const TONE_CLASSES: Record<Tone, string> = {
-  neutral: "bg-[var(--surface)] text-[var(--sea-ink-soft)] border-[var(--line)]",
-  info: "bg-[rgba(79,184,178,0.16)] text-[var(--lagoon-deep)] border-[rgba(50,143,151,0.3)]",
-  success: "bg-[rgba(47,106,74,0.14)] text-[var(--palm)] border-[rgba(47,106,74,0.28)]",
-  warning: "bg-[rgba(214,158,46,0.16)] text-[#9a6b12] border-[rgba(214,158,46,0.32)]",
-  danger: "bg-[rgba(192,70,60,0.14)] text-[#a93a31] border-[rgba(192,70,60,0.3)]",
+  neutral: "bg-muted text-muted-foreground border-border",
+  info: "bg-primary/15 text-primary border-primary/30",
+  success: "bg-success/15 text-success border-success/30",
+  warning: "bg-warning/15 text-warning border-warning/30",
+  danger: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
 export function Badge(props: Props) {

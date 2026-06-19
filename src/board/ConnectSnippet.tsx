@@ -1,5 +1,5 @@
 import React from "react";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check } from "@phosphor-icons/react";
 import { toast } from "../ui/toaster";
 
 const MCP_URL = `${import.meta.env.VITE_CONVEX_SITE_URL ?? ""}/api/mcp`;
@@ -45,11 +45,11 @@ export function ConnectSnippet(props: Props) {
         type="button"
         onClick={copy}
         aria-label="Copy snippet"
-        className="absolute right-3 top-3 rounded-md border border-[var(--line)] bg-[var(--surface)] p-1.5 text-[var(--sea-ink-soft)] transition hover:text-[var(--sea-ink)]"
+        className="absolute right-3 top-3 rounded-md border border-border bg-muted p-1.5 text-muted-foreground transition hover:text-foreground"
       >
         {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
       </button>
-      <pre className="overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 text-left font-mono text-xs text-[var(--sea-ink)]">
+      <pre className="overflow-auto rounded-2xl border border-border bg-muted p-4 text-left font-mono text-xs text-foreground">
         {config}
       </pre>
     </div>

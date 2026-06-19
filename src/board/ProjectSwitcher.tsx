@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus } from "lucide-react";
+import { Plus } from "@phosphor-icons/react";
 import { cn } from "../lib/cn";
 import { Button } from "../ui/button";
 import type { ProjectSummary } from "./types";
@@ -31,9 +31,9 @@ export function ProjectSwitcher(props: Props) {
           type="button"
           onClick={() => props.onSelect(project._id)}
           className={cn("rounded-full border px-3 py-1.5 text-sm font-medium transition", {
-            "border-[var(--lagoon-deep)] bg-[rgba(79,184,178,0.16)] text-[var(--lagoon-deep)]":
+            "border-primary bg-primary/10 text-primary":
               project._id === props.activeProjectId,
-            "border-[var(--line)] bg-[var(--surface)] text-[var(--sea-ink-soft)] hover:text-[var(--sea-ink)]":
+            "border-border bg-muted text-muted-foreground hover:text-foreground":
               project._id !== props.activeProjectId,
           })}
         >
@@ -52,7 +52,7 @@ export function ProjectSwitcher(props: Props) {
               if (event.key === "Escape") setCreating(false);
             }}
             placeholder="Project name"
-            className="h-9 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--sea-ink)] focus:border-[var(--lagoon-deep)] focus:outline-none"
+            className="h-9 rounded-full border border-border bg-muted px-3 text-sm text-foreground focus:border-primary focus:outline-none"
           />
           <Button size="sm" onClick={submitNew}>
             Add
@@ -62,7 +62,7 @@ export function ProjectSwitcher(props: Props) {
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--line)] px-3 py-1.5 text-sm text-[var(--sea-ink-soft)] transition hover:text-[var(--sea-ink)]"
+          className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground"
         >
           <Plus className="h-3.5 w-3.5" />
           New project

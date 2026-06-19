@@ -18,10 +18,10 @@ export function TaskCard(props: Props) {
   return (
     <Card interactive onClick={() => props.onOpen(task._id)}>
       <div className="flex items-start justify-between gap-2">
-        <h4 className="text-sm font-semibold leading-snug text-[var(--sea-ink)]">{task.title}</h4>
+        <h4 className="text-sm font-semibold leading-snug text-foreground">{task.title}</h4>
         <span
           className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", {
-            "animate-pulse bg-[var(--lagoon-deep)]": waitingOnYou,
+            "animate-pulse bg-primary": waitingOnYou,
             "bg-transparent": !waitingOnYou,
           })}
           aria-hidden="true"
@@ -36,7 +36,7 @@ export function TaskCard(props: Props) {
           </Badge>
         ))}
       </div>
-      <p className="mt-2 text-xs text-[var(--sea-ink-soft)]">
+      <p className="mt-2 text-xs text-muted-foreground">
         {relativeAge(task.createdAt, props.now)}
       </p>
     </Card>

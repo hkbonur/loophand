@@ -22,7 +22,7 @@ export function CardDialog(props: Props) {
           <Spinner />
         </div>
       ) : task === null ? (
-        <div className="p-8 text-sm text-[var(--sea-ink-soft)]">
+        <div className="p-8 text-sm text-muted-foreground">
           This task is no longer available.
         </div>
       ) : (
@@ -36,28 +36,28 @@ export function CardDialog(props: Props) {
                 </Badge>
               ))}
             </div>
-            <h2 className="text-lg font-bold text-[var(--sea-ink)]">{task.title}</h2>
+            <h2 className="text-lg font-bold text-foreground">{task.title}</h2>
             <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--sea-ink-soft)]">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Instructions
               </p>
-              <p className="whitespace-pre-wrap text-sm text-[var(--sea-ink)]">
+              <p className="whitespace-pre-wrap text-sm text-foreground">
                 {task.instructions}
               </p>
             </div>
             {task.acceptanceCriteria ? (
               <div>
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--sea-ink-soft)]">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Acceptance criteria
                 </p>
-                <p className="whitespace-pre-wrap text-sm text-[var(--sea-ink)]">
+                <p className="whitespace-pre-wrap text-sm text-foreground">
                   {task.acceptanceCriteria}
                 </p>
               </div>
             ) : null}
           </div>
 
-          <div className="border-t border-[var(--line)] pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
+          <div className="border-t border-border pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
             {task.status === "open" ? (
               <ApprovalPanel task={task} onResolved={props.onClose} />
             ) : (

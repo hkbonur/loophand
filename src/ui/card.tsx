@@ -13,7 +13,7 @@ export function Card(props: Props) {
     <div
       onClick={props.onClick}
       className={cn(
-        "rounded-2xl border border-[var(--line)] bg-[var(--surface-strong)] p-3 shadow-sm transition",
+        "rounded-2xl border border-border bg-card p-3 shadow-sm transition",
         {
           "cursor-pointer hover:-translate-y-0.5 hover:shadow-md": props.interactive,
         },

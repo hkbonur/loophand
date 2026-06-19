@@ -16,8 +16,8 @@ export function Textarea(props: Props) {
       placeholder={props.placeholder}
       rows={props.rows ?? 3}
       className={cn(
-        "w-full resize-y rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--sea-ink)]",
-        "placeholder:text-[var(--sea-ink-soft)] focus:border-[var(--lagoon-deep)] focus:outline-none",
+        "w-full resize-y rounded-2xl border border-input bg-muted px-3 py-2 text-sm text-foreground",
+        "placeholder:text-muted-foreground focus:border-primary focus:outline-none",
         props.className,
       )}
     />

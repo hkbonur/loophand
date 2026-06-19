@@ -1,4 +1,5 @@
 import { Badge } from "../ui/badge";
+import { SectionLabel } from "./SectionLabel";
 import { outcomeBadge } from "./format";
 import type { TaskView } from "./types";
 
@@ -18,9 +19,7 @@ export function ResultPanel(props: Props) {
         </div>
       ) : null}
       <div>
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Returns to the agent
-        </p>
+        <SectionLabel>Returns to the agent</SectionLabel>
         <pre className="max-h-64 overflow-auto rounded-2xl border border-border bg-muted p-3 font-mono text-xs text-foreground">
           {JSON.stringify(task.result ?? { status: task.status }, null, 2)}
         </pre>

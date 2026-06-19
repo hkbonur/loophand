@@ -30,12 +30,15 @@ export function ProjectSwitcher(props: Props) {
           key={project._id}
           type="button"
           onClick={() => props.onSelect(project._id)}
-          className={cn("rounded-full border px-3 py-1.5 text-sm font-medium transition", {
-            "border-primary bg-primary/10 text-primary":
-              project._id === props.activeProjectId,
-            "border-border bg-muted text-muted-foreground hover:text-foreground":
-              project._id !== props.activeProjectId,
-          })}
+          className={cn(
+            "rounded-full border px-3 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+            {
+              "border-primary bg-primary/10 text-primary":
+                project._id === props.activeProjectId,
+              "border-border bg-muted text-muted-foreground hover:text-foreground":
+                project._id !== props.activeProjectId,
+            },
+          )}
         >
           {project.name}
         </button>
@@ -52,7 +55,7 @@ export function ProjectSwitcher(props: Props) {
               if (event.key === "Escape") setCreating(false);
             }}
             placeholder="Project name"
-            className="h-9 rounded-full border border-border bg-muted px-3 text-sm text-foreground focus:border-primary focus:outline-none"
+            className="h-9 rounded-full border border-border bg-muted px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30"
           />
           <Button size="sm" onClick={submitNew}>
             Add
@@ -62,7 +65,7 @@ export function ProjectSwitcher(props: Props) {
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground"
+          className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         >
           <Plus className="h-3.5 w-3.5" />
           New project

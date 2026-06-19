@@ -1,6 +1,5 @@
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
-import { cn } from "../lib/cn";
 import { outcomeBadge, relativeAge } from "./format";
 import type { TaskView } from "./types";
 
@@ -19,13 +18,12 @@ export function TaskCard(props: Props) {
     <Card interactive onClick={() => props.onOpen(task._id)}>
       <div className="flex items-start justify-between gap-2">
         <h4 className="text-sm font-semibold leading-snug text-foreground">{task.title}</h4>
-        <span
-          className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", {
-            "animate-pulse bg-primary": waitingOnYou,
-            "bg-transparent": !waitingOnYou,
-          })}
-          aria-hidden="true"
-        />
+        {waitingOnYou ? (
+          <span className="mt-1 flex shrink-0 items-center">
+            <span className="h-2 w-2 rounded-full bg-primary motion-safe:animate-pulse" />
+            <span className="sr-only">Waiting on you</span>
+          </span>
+        ) : null}
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <Badge tone="info">{task.type}</Badge>
@@ -36,7 +34,7 @@ export function TaskCard(props: Props) {
           </Badge>
         ))}
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">
+      <p className="mt-2 text-xs tabular-nums text-muted-foreground">
         {relativeAge(task.createdAt, props.now)}
       </p>
     </Card>

@@ -78,27 +78,27 @@ function BoardInner() {
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="island-kicker mb-1">loophand</p>
-          <h1 className="text-2xl font-bold text-foreground">Board</h1>
+      <div className="mb-6 pr-24">
+        <p className="island-kicker mb-1">loophand</p>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Board</h1>
+      </div>
+
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <ProjectSwitcher
+            projects={projects}
+            activeProjectId={activeProjectId}
+            onSelect={setActiveProjectId}
+            onCreate={onCreateProject}
+          />
         </div>
         <Link
           to="/settings/agents"
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground no-underline transition hover:bg-card"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground no-underline transition hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         >
           <Gear className="h-4 w-4" />
           Agents
         </Link>
-      </div>
-
-      <div className="mb-6">
-        <ProjectSwitcher
-          projects={projects}
-          activeProjectId={activeProjectId}
-          onSelect={setActiveProjectId}
-          onCreate={onCreateProject}
-        />
       </div>
 
       {tasks !== undefined && tasks.length === 0 ? (
@@ -118,6 +118,7 @@ function BoardInner() {
               column={column}
               tasks={(tasks ?? []).filter((task: TaskView) => task.status === column.status)}
               now={now}
+              loading={tasks === undefined}
               onOpen={setSelectedTaskId}
             />
           ))}

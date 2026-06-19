@@ -50,6 +50,7 @@ import type * as lib_screenshots from "../lib/screenshots.js";
 import type * as lib_taskConstants from "../lib/taskConstants.js";
 import type * as lib_taskViews from "../lib/taskViews.js";
 import type * as projects from "../projects.js";
+import type * as push from "../push.js";
 import type * as rateLimit from "../rateLimit.js";
 import type * as seed from "../seed.js";
 import type * as tasks from "../tasks.js";
@@ -104,6 +105,7 @@ declare const fullApi: ApiFromModules<{
   "lib/taskConstants": typeof lib_taskConstants;
   "lib/taskViews": typeof lib_taskViews;
   projects: typeof projects;
+  push: typeof push;
   rateLimit: typeof rateLimit;
   seed: typeof seed;
   tasks: typeof tasks;

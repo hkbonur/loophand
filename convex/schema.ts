@@ -47,6 +47,8 @@ export default defineSchema({
     image: v.optional(v.string()),
     provider: v.optional(v.string()),
     createdAt: v.optional(v.number()),
+    // Throttle clock for owner push notifications (see tasks.maybeNotifyOwner).
+    lastNotifiedAt: v.optional(v.number()),
   }).index("by_email", ["email"]),
 
   // Bearer credentials, bound to `userId`. `api_key` = user-minted;

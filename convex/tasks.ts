@@ -189,6 +189,23 @@ async function resolveProjectRef(
   });
 }
 
+// One push per user per window, so a burst of task creates doesn't fire a
+// notification for each. `lastNotifiedAt` on the user is the throttle clock.
+const PUSH_THROTTLE_MS = 15_000;
+
+async function maybeNotifyOwner(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  taskId: Id<"tasks">,
+  now: number,
+): Promise<void> {
+  const user = await ctx.db.get(userId);
+  if (user && now - (user.lastNotifiedAt ?? 0) < PUSH_THROTTLE_MS) return;
+  await ctx.db.patch(userId, { lastNotifiedAt: now });
+  // Best-effort: the notify action is a no-op when push isn't configured.
+  await ctx.scheduler.runAfter(0, internal.notify.push, { taskId });
+}
+
 // ── Agent-facing (trusted userId from token auth, used by MCP tools) ─────────
 
 export const createForAgent = internalMutation({
@@ -285,6 +302,7 @@ export const createForAgent = internalMutation({
       createdAt: now,
     });
     if (expiresAt) await ctx.scheduler.runAt(expiresAt, internal.tasks.expire, { taskId });
+    await maybeNotifyOwner(ctx, args.userId, taskId, now);
 
     const task = await ctx.db.get(taskId);
     if (!task) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });

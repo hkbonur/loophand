@@ -189,6 +189,28 @@ async function resolveProjectRef(
   });
 }
 
+// One push per user per window, so a burst of task creates doesn't fire a
+// notification for each. `lastNotifiedAt` on the user is the throttle clock.
+const PUSH_THROTTLE_MS = 15_000;
+
+async function maybeNotifyOwner(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  taskId: Id<"tasks">,
+  now: number,
+): Promise<void> {
+  // Skip the user-row write + scheduled action entirely when push isn't
+  // configured (e.g. a deployment without VAPID) — keeps create off that path.
+  if (!process.env.VAPID_PUBLIC_KEY) return;
+  const user = await ctx.db.get(userId);
+  if (user && now - (user.lastNotifiedAt ?? 0) < PUSH_THROTTLE_MS) return;
+  // The read-modify-write on this row makes concurrent creates a Convex OCC
+  // write-write conflict: one retries against the fresh stamp, so exactly one
+  // push fires per window even under a race.
+  await ctx.db.patch(userId, { lastNotifiedAt: now });
+  await ctx.scheduler.runAfter(0, internal.notify.push, { taskId });
+}
+
 // ── Agent-facing (trusted userId from token auth, used by MCP tools) ─────────
 
 export const createForAgent = internalMutation({
@@ -285,6 +307,7 @@ export const createForAgent = internalMutation({
       createdAt: now,
     });
     if (expiresAt) await ctx.scheduler.runAt(expiresAt, internal.tasks.expire, { taskId });
+    await maybeNotifyOwner(ctx, args.userId, taskId, now);
 
     const task = await ctx.db.get(taskId);
     if (!task) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
@@ -408,12 +431,19 @@ export const list = query({
   },
 });
 
+// Accepts a raw string id (push deep-links pass `?task=<id>` unvalidated) and
+// returns null — never throws — for a malformed, missing, or not-owned task, so
+// clicking a stale/foreign notification shows the empty state instead of
+// crashing the board. Null is identical for "gone" and "not yours": no leak.
 export const get = query({
-  args: { taskId: v.id("tasks") },
+  args: { taskId: v.string() },
   returns: v.union(taskViewValidator, v.null()),
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
-    const task = await assertOwnedTask(ctx, args.taskId, userId);
+    const taskId = ctx.db.normalizeId("tasks", args.taskId);
+    if (!taskId) return null;
+    const task = await ctx.db.get(taskId);
+    if (!task || task.userId !== userId) return null;
     return enrichTaskView(ctx, task);
   },
 });

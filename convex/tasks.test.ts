@@ -162,7 +162,11 @@ describe("tasks lifecycle", () => {
       instructions: "secret",
     });
 
-    await expect(asStranger.query(api.tasks.get, { taskId: task.task_id })).rejects.toThrow();
+    // A foreign or stale task reads back as null (no throw, no existence leak) —
+    // so a push deep-link to a task you no longer own shows the empty state.
+    expect(await asStranger.query(api.tasks.get, { taskId: task.task_id })).toBeNull();
+    // A malformed id from a tampered ?task= URL is also graceful.
+    expect(await asStranger.query(api.tasks.get, { taskId: "not-a-real-id" })).toBeNull();
   });
 
   test("expire is a no-op once the task has left the queue", async () => {

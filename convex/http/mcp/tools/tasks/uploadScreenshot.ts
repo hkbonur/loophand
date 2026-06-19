@@ -19,7 +19,7 @@ const schema = z.object({
 export const uploadScreenshotTool = defineTool({
   name: "upload_screenshot",
   description:
-    "Stores a screenshot image and returns a file_id. Pass that id as create_task tool_payload.screenshotFileId to open a visual_review task. You upload the bytes directly — no URL is ever fetched server-side.",
+    "Stores a screenshot image and returns a file_id. Pass that id as create_task tool_payload.screenshot_file_id to open a visual_review task. You upload the bytes directly — no URL is ever fetched server-side.",
   schema,
   responseShape: mcpEnvelope({ file_id: z.string() }),
   execute: async (mcpCtx, input) => {

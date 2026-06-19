@@ -7,6 +7,9 @@ import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
 
+// storageProxyUrl requires CONVEX_SITE_URL (auto-injected in real deployments).
+process.env.CONVEX_SITE_URL = "https://test.convex.site";
+
 async function setupOwner(t: ReturnType<typeof convexTest>, email: string) {
   return t.run(async (ctx) => {
     const userId = await ctx.db.insert("users", { email, createdAt: Date.now() });

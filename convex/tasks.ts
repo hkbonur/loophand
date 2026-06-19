@@ -14,16 +14,21 @@ import { assertOwnedTask, assertOwnedProject } from "./lib/ownership";
 import { ensureDefaultProject, findProjectByName } from "./lib/projectHelpers";
 import { assertUploadOwnedBy, attachUploadToTask } from "./files";
 import { storageProxyUrl } from "./lib/r2";
-import { TASK_STATUSES, TASK_OUTCOMES } from "./schema";
+import {
+  TASK_STATUSES,
+  TASK_OUTCOMES,
+  viewportValidator,
+  toolPayloadValidator,
+} from "./schema";
 import { isTaskType, TASK_TYPES, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
 
 const statusValidator = v.union(...TASK_STATUSES.map((s) => v.literal(s)));
 const outcomeValidator = v.union(...TASK_OUTCOMES.map((o) => v.literal(o)));
 
-// visual_review input: the screenshot the human annotates, plus which viewports
-// to show. Validated here; stored on the task's `toolPayload`.
-const viewportValidator = v.union(v.literal("desktop"), v.literal("mobile"));
-const toolPayloadValidator = v.object({
+// Create-time payload: the agent passes the screenshot id as a raw string,
+// which createForAgent normalizes and ownership-checks before storing it as the
+// typed `toolPayloadValidator` shape.
+const toolPayloadInputValidator = v.object({
   screenshotFileId: v.string(),
   viewports: v.optional(v.array(viewportValidator)),
 });
@@ -67,7 +72,7 @@ const taskViewValidator = v.object({
   outcome: v.union(outcomeValidator, v.null()),
   result: v.any(),
   // Tool input echoed for the board (e.g. visual_review's screenshot + viewports).
-  toolPayload: v.any(),
+  toolPayload: v.union(toolPayloadValidator, v.null()),
   // Resolved storage-proxy URL for the visual_review screenshot, or null.
   screenshotUrl: v.union(v.string(), v.null()),
   resultVersion: v.number(),
@@ -115,20 +120,13 @@ function toTaskView(task: Doc<"tasks">) {
   };
 }
 
-function screenshotFileIdOf(toolPayload: unknown): string | null {
-  const id = (toolPayload as { screenshotFileId?: unknown } | null | undefined)?.screenshotFileId;
-  return typeof id === "string" ? id : null;
-}
-
 // Turn a stored screenshot reference into an embeddable proxy URL for the board.
 async function resolveScreenshotUrl(
   ctx: QueryCtx | MutationCtx,
-  toolPayload: unknown,
+  toolPayload: Doc<"tasks">["toolPayload"],
 ): Promise<string | null> {
-  const rawId = screenshotFileIdOf(toolPayload);
-  if (!rawId) return null;
-  const fileId = ctx.db.normalizeId("managedFiles", rawId);
-  if (!fileId) return null;
+  if (!toolPayload) return null;
+  const fileId: Id<"managedFiles"> = toolPayload.screenshotFileId;
   const file = await ctx.db.get(fileId);
   return file ? storageProxyUrl(file.r2Key) : null;
 }
@@ -203,7 +201,7 @@ export const createForAgent = internalMutation({
     instructions: v.string(),
     acceptanceCriteria: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
-    toolPayload: v.optional(toolPayloadValidator),
+    toolPayload: v.optional(toolPayloadInputValidator),
     idempotencyKey: v.optional(v.string()),
     ttlSeconds: v.optional(v.number()),
   },
@@ -217,14 +215,14 @@ export const createForAgent = internalMutation({
     }
 
     // A visual_review must carry a screenshot; no other type accepts a payload.
-    if (args.type === "visual_review") {
-      if (!args.toolPayload?.screenshotFileId) {
-        throw new ConvexError({
-          code: "VALIDATION_ERROR",
-          message: "visual_review requires tool_payload.screenshotFileId — upload one with upload_screenshot first.",
-        });
-      }
-    } else if (args.toolPayload) {
+    if (args.type === "visual_review" && !args.toolPayload?.screenshotFileId) {
+      throw new ConvexError({
+        code: "VALIDATION_ERROR",
+        message:
+          "visual_review requires tool_payload.screenshotFileId — upload one with upload_screenshot first.",
+      });
+    }
+    if (args.type !== "visual_review" && args.toolPayload) {
       throw new ConvexError({
         code: "VALIDATION_ERROR",
         message: `tool_payload is only valid for visual_review tasks, not "${args.type}".`,

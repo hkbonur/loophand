@@ -3,9 +3,11 @@ import { internalAction, internalMutation, type MutationCtx } from "./_generated
 import type { Doc, Id } from "./_generated/dataModel";
 import { r2 } from "./lib/r2";
 
-// How long an uploaded-but-unreferenced blob is held before the cleanup cron
-// reclaims it. The upload is "claimed" the moment a task references it
-// (create_task for visual_review); until then it lives on the uploader ledger.
+// Minimum hold for an uploaded-but-unreferenced blob: once this lapses the
+// upload is eligible for reclamation by the daily cleanup cron (so actual
+// reclaim latency is up to ~a day, not exactly an hour). The upload is
+// "claimed" the moment a task references it (create_task for visual_review);
+// until then it lives on the uploader ledger.
 export const UPLOAD_CLAIM_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 // Records a freshly uploaded R2 blob: the owner-agnostic `managedFiles` row plus

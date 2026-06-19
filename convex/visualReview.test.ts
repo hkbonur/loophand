@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 
@@ -152,5 +152,43 @@ describe("visual_review create + tool_payload", () => {
         toolPayload: { screenshotFileId: fileId },
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe("visual_review human view", () => {
+  test("resolves the screenshot to a storage-proxy URL and exposes the payload", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId } = await setupOwner(t, "owner@example.com");
+    const fileId = await uploadScreenshot(t, userId, "viewkey00000000001");
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId,
+      tokenId,
+      type: "visual_review",
+      title: "v",
+      instructions: "x",
+      toolPayload: { screenshotFileId: fileId, viewports: ["mobile"] },
+    });
+
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    const view = await asOwner.query(api.tasks.get, { taskId: task.task_id });
+    expect(view?.toolPayload).toMatchObject({ viewports: ["mobile"] });
+    expect(view?.screenshotUrl).toContain("/api/storage/viewkey00000000001");
+  });
+
+  test("an approval task carries no screenshot", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId } = await setupOwner(t, "owner@example.com");
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId,
+      tokenId,
+      type: "approval",
+      title: "a",
+      instructions: "x",
+    });
+
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    const view = await asOwner.query(api.tasks.get, { taskId: task.task_id });
+    expect(view?.toolPayload).toBeNull();
+    expect(view?.screenshotUrl).toBeNull();
   });
 });

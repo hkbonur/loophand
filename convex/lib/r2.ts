@@ -18,3 +18,12 @@ export function isValidR2Key(key: string): boolean {
 export function generateR2Key(): string {
   return crypto.randomUUID().replace(/-/g, "");
 }
+
+// Permanent, embeddable URL for a stored blob. Points at the storage proxy on
+// the Convex site domain (`registerStorageRoutes`), which signs a fresh R2 URL
+// per request. CONVEX_SITE_URL is injected by the deployment; if absent (tests)
+// the path is relative.
+export function storageProxyUrl(r2Key: string): string {
+  const base = process.env.CONVEX_SITE_URL ?? "";
+  return `${base}/api/storage/${r2Key}`;
+}

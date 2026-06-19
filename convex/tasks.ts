@@ -13,6 +13,7 @@ import { requireAuth } from "./lib/auth";
 import { assertOwnedTask, assertOwnedProject } from "./lib/ownership";
 import { ensureDefaultProject, findProjectByName } from "./lib/projectHelpers";
 import { assertUploadOwnedBy, attachUploadToTask } from "./files";
+import { storageProxyUrl } from "./lib/r2";
 import { TASK_STATUSES, TASK_OUTCOMES } from "./schema";
 import { isTaskType, TASK_TYPES, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
 
@@ -52,6 +53,10 @@ const taskViewValidator = v.object({
   status: statusValidator,
   outcome: v.union(outcomeValidator, v.null()),
   result: v.any(),
+  // Tool input echoed for the board (e.g. visual_review's screenshot + viewports).
+  toolPayload: v.any(),
+  // Resolved storage-proxy URL for the visual_review screenshot, or null.
+  screenshotUrl: v.union(v.string(), v.null()),
   resultVersion: v.number(),
   revision: v.number(),
   createdByTokenId: v.union(v.id("apiTokens"), v.null()),
@@ -94,6 +99,34 @@ function toTaskView(task: Doc<"tasks">) {
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
     expiresAt: task.expiresAt ?? null,
+  };
+}
+
+function screenshotFileIdOf(toolPayload: unknown): string | null {
+  const id = (toolPayload as { screenshotFileId?: unknown } | null | undefined)?.screenshotFileId;
+  return typeof id === "string" ? id : null;
+}
+
+// Turn a stored screenshot reference into an embeddable proxy URL for the board.
+async function resolveScreenshotUrl(
+  ctx: QueryCtx | MutationCtx,
+  toolPayload: unknown,
+): Promise<string | null> {
+  const rawId = screenshotFileIdOf(toolPayload);
+  if (!rawId) return null;
+  const fileId = ctx.db.normalizeId("managedFiles", rawId);
+  if (!fileId) return null;
+  const file = await ctx.db.get(fileId);
+  return file ? storageProxyUrl(file.r2Key) : null;
+}
+
+// The board view plus the fields that need a lookup: the tool payload and its
+// resolved screenshot URL.
+async function enrichTaskView(ctx: QueryCtx | MutationCtx, task: Doc<"tasks">) {
+  return {
+    ...toTaskView(task),
+    toolPayload: task.toolPayload ?? null,
+    screenshotUrl: await resolveScreenshotUrl(ctx, task.toolPayload),
   };
 }
 
@@ -359,7 +392,8 @@ export const list = query({
       .query("tasks")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
-    return rows.sort((a, b) => b.createdAt - a.createdAt).map(toTaskView);
+    const sorted = rows.sort((a, b) => b.createdAt - a.createdAt);
+    return Promise.all(sorted.map((task) => enrichTaskView(ctx, task)));
   },
 });
 
@@ -369,7 +403,7 @@ export const get = query({
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
     const task = await assertOwnedTask(ctx, args.taskId, userId);
-    return toTaskView(task);
+    return enrichTaskView(ctx, task);
   },
 });
 
@@ -431,7 +465,7 @@ export const resolve = mutation({
     });
     const updated = await ctx.db.get(args.taskId);
     if (!updated) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
-    return toTaskView(updated);
+    return enrichTaskView(ctx, updated);
   },
 });
 

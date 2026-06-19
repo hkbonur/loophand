@@ -1,6 +1,7 @@
 import { v, ConvexError } from "convex/values";
-import { internalMutation, type MutationCtx } from "./_generated/server";
+import { internalAction, internalMutation, type MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { r2 } from "./lib/r2";
 
 // How long an uploaded-but-unreferenced blob is held before the cleanup cron
 // reclaims it. The upload is "claimed" the moment a task references it
@@ -79,3 +80,15 @@ export async function attachUploadToTask(
     .first();
   if (claim) await ctx.db.delete(claim._id);
 }
+
+// Removes the underlying R2 object. Scheduled (not called inline) so the
+// cleanup mutation stays pure-DB and fast — the blob delete is the only piece
+// that touches the network.
+export const deleteBlob = internalAction({
+  args: { r2Key: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await r2.deleteObject(ctx, args.r2Key);
+    return null;
+  },
+});

@@ -31,8 +31,11 @@ self.addEventListener("notificationclick", (event) => {
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
         if ("focus" in client) {
-          if ("navigate" in client) client.navigate(url);
-          return client.focus();
+          // Await navigate before focus so the deep-link lands even if the SW
+          // is torn down right after the click.
+          return ("navigate" in client ? client.navigate(url) : Promise.resolve()).then(() =>
+            client.focus(),
+          );
         }
       }
       return self.clients.openWindow(url);

@@ -21,12 +21,13 @@ const fakeSubscription = {
 };
 const pushManager = {
   subscribe: vi.fn(() => Promise.resolve(fakeSubscription)),
-  getSubscription: vi.fn(() => Promise.resolve(null)),
+  getSubscription: vi.fn((): Promise<typeof fakeSubscription | null> => Promise.resolve(null)),
 };
 
 beforeEach(() => {
   mutationSpy.mockClear();
   pushManager.subscribe.mockClear();
+  fakeSubscription.unsubscribe.mockClear();
   pushManager.getSubscription.mockResolvedValue(null);
   vi.stubGlobal("Notification", {
     permission: "default",
@@ -78,6 +79,22 @@ describe("usePushNotifications.enable", () => {
 
     expect(pushManager.subscribe).not.toHaveBeenCalled();
     expect(mutationSpy).not.toHaveBeenCalled();
+    expect(result.current.subscribed).toBe(false);
+  });
+});
+
+describe("usePushNotifications.disable", () => {
+  test("unsubscribes from the browser and clears the server record", async () => {
+    pushManager.getSubscription.mockResolvedValue(fakeSubscription);
+    const { result } = renderHook(() => usePushNotifications());
+    await waitFor(() => expect(result.current.subscribed).toBe(true)); // mount reflects existing
+
+    await act(async () => {
+      await result.current.disable();
+    });
+
+    expect(mutationSpy).toHaveBeenCalledWith({ endpoint: fakeSubscription.endpoint });
+    expect(fakeSubscription.unsubscribe).toHaveBeenCalled();
     expect(result.current.subscribed).toBe(false);
   });
 });

@@ -3,21 +3,38 @@ import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import { usePushNotifications, type PushNotifications } from "./usePushNotifications";
 
-// Offer the nudge only when there's something useful to do: the browser can do
-// push, the server has VAPID configured, and the human hasn't already
-// subscribed or denied permission.
-function canOfferPush(push: PushNotifications): boolean {
+// Push is usable at all: the browser supports it, the server has VAPID
+// configured, and permission hasn't been denied.
+function pushAvailable(push: PushNotifications): boolean {
   if (!push.supported) return false;
   if (!push.configured) return false;
-  if (push.subscribed) return false;
   if (push.permission === "denied") return false;
   return true;
 }
 
-// A one-line nudge to turn on web push.
+// When push is usable: a nudge to enable it, or — once on — a quiet way to turn
+// it back off. Renders nothing when push can't be offered.
 export function PushPrompt() {
   const push = usePushNotifications();
-  if (!canOfferPush(push)) return null;
+  if (!pushAvailable(push)) return null;
+
+  if (push.subscribed) {
+    return (
+      <div className="mb-6 flex items-center gap-2 text-xs text-muted-foreground">
+        <Bell className="h-3.5 w-3.5" />
+        <span>Notifications on.</span>
+        <button
+          type="button"
+          onClick={push.disable}
+          disabled={push.busy}
+          className="underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+        >
+          Turn off
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="mb-6 flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-2.5 text-sm">
       <Bell className="h-4 w-4 shrink-0 text-muted-foreground" />

@@ -6,6 +6,9 @@ import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
 
+// maybeNotifyOwner only fires when push is configured (see convex/tasks.ts).
+process.env.VAPID_PUBLIC_KEY = "test-public-key";
+
 async function setupUser(t: ReturnType<typeof convexTest>, email: string) {
   return t.run((ctx) => ctx.db.insert("users", { email, createdAt: Date.now() }));
 }

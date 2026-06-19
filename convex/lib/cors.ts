@@ -14,8 +14,12 @@ function allowedOrigin(request: Request): string {
 
 const BASE_HEADERS = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  // `Better-Auth-Cookie` carries the session for the cross-domain auth flow
+  // (frontend origin ≠ Convex origin); `Set-Better-Auth-Cookie` is the matching
+  // response header the better-auth client reads back, so it must be exposed.
   "Access-Control-Allow-Headers":
-    "Content-Type, Authorization, mcp-protocol-version, mcp-session-id",
+    "Content-Type, Authorization, Better-Auth-Cookie, mcp-protocol-version, mcp-session-id",
+  "Access-Control-Expose-Headers": "Set-Better-Auth-Cookie",
   "Access-Control-Max-Age": "86400",
 };
 

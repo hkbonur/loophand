@@ -28,6 +28,7 @@ export const ALLOWED_VERBS: ReadonlySet<string> = new Set([
   "cancel",
   "fetch",
   "resume",
+  "upload",
 ]);
 
 // Verbs that read state without mutating. `await` is a read (it long-polls for a

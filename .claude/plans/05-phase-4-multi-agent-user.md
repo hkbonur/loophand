@@ -1,55 +1,53 @@
-# Phase 4 — Multi-agent / multi-user (shared team board)
+# Phase 4 — Multi-agent project board (tags, attribution, search)
 
-**Goal:** several agents and several humans share one board cleanly and safely — attribution, roles, claim conflicts, presence, search.
-**Depends on:** Phase 1 (auth/tenancy already enforced per-function).
-**Rough size:** 1.5–2 weeks.
+**Goal:** many agent tokens write to one human's projects cleanly — attribution (which agent raised a card), **ticket tags** for grouping work (e.g. a feature name), board search/filter, and agent last-seen. **Single human user — no teams.** Multi-user (members / roles / invites / presence / assignment) is explicitly **parked to After v1** (see Phase 7).
+**Depends on:** Phase 1 (auth/tenancy already enforced per-function on `userId`/`projectId`).
+**Rough size:** 1–1.5 weeks.
 
 ---
 
 ## Backend (Convex)
 
-1. **Members & roles:** `workspaceMembers.role` (`owner|admin|member`) now enforced. Reuse `workspaceInvites` for invite flow; `members.invite/list/setRole/remove`.
-2. **Authorization helpers:** `requireRole(ctx, ["owner","admin"])`; gate **destructive approvals** (a `diff_review` migration/force-push — Phase 6 tool, but gate defined here) to owner/admin/assignee. `claim`/`complete` require workspace membership.
-3. **Attribution:** `createdByTokenId` surfaced; join to a friendly agent name (the `apiTokens.name`).
-4. **Presence:** lightweight `presence` (ephemeral table or heartbeat) — who's viewing the board + which card each has open. `presence.heartbeat(boardId, taskId?)` every ~15s; stale rows pruned by cron.
-5. **Audit:** `taskAudit` writes on every approve/reject/cancel/assign (server-only).
-6. **Agent last-seen:** stamp `apiTokens.lastUsedAt` on any tool call (already in `apiTokenAuth`) — surface "agent went dark."
+1. **Agents = API tokens:** a user mints multiple named tokens, each a distinct "agent." `apiTokens.lastUsedAt` is stamped on every tool call (already in `apiTokenAuth`) → drives an "agent went dark" signal. `tokens.list` / `tokens.mint` / `tokens.revoke` (owner-scoped).
+2. **Tags:** `tasks.tags: string[]` (defined Phase 0). `tasks.setTags(taskId, tags)`; a `projects.distinctTags(projectId)` query (distinct tags in a project) for the filter UI. **Normalize** on write — trim, lowercase, dedupe, cap count + length.
+3. **Attribution:** surface `createdByTokenId` (raising agent → `apiTokens.name`) and `resumedByTokenId` (which agent re-picked the result). The human resolver is implicit (single user).
+4. **Audit:** `taskAudit` writes on every resolve (approve / request-changes / cancel) and close (server-only).
+5. **No claim/lock** — review is in-place while the card is `open` (no `in_progress` state, no cross-tab steal to build). The reactive `useQuery` already keeps every open board/dialog live.
 
 ## MCP
-- No new tools. `list_boards`/`list_tasks(mine)` already support multi-agent recovery.
-- Ensure scope checks distinguish a read-only agent token from a writer.
+
+- **No new task verbs.** `list_projects` / `list_tasks(project?, status?, tags?, mine?)` already cover multi-agent recovery + tag filtering; `create_task` already accepts `tags`.
+- Enforce the **read-only vs writer** distinction via the Phase 1 scope check (`tasks:read` token can list/get but not create/resolve).
 
 ## Frontend — build
 
-**Reuse:** `src/ui` `filter-menu`/`filter-select` (board search), `avatar`, `dropdown-menu`, `command`, `dialog`, `sonner`.
+**Reuse (`src/ui`):** `filter-menu`/`filter-select` (board search), `badge` (tag chips), `avatar` (agent), `dropdown-menu`, `command`, `dialog`, `sonner`.
 
 **Build:**
-- **`AgentsPanel`** (settings) — list tokens/agents: name, last-seen, scopes, revoke; mint (plaintext once).
-- **`MembersPanel`** — invite (link/code), list, role select, remove.
-- **`PresenceBar`** — avatars of who's on the board; per-card "X is viewing".
-- **Claim-conflict UI** — claim rejected (someone grabbed it) → "Taken by Alex" read-only state with a **steal** option; live-driven by the reactive query.
-- **Assignee** — assign a card to a member (`tasks.assign`); assignee avatar on the card; notifications route to the assignee only.
-- **Board search/filter** — by agent, type, status (essential once multi-agent boards fill up).
-- **Card attribution** — raising-agent avatar + assignee/claimer avatar.
+- **`AgentsPanel`** (settings) — list tokens/agents: name, last-seen, scopes, revoke; mint (plaintext once). (Stubbed in Phase 1 onboarding — complete it here.)
+- **Tags UI** — tag chips on `Card`; add/edit tags in `CardDialog`; a **tag filter** in the board toolbar fed by `projects.distinctTags`.
+- **Board search/filter** — by **tag**, agent, type, status (essential once an agent fills the board).
+- **Card attribution** — raising-agent avatar + name; in **Agent working**, show which agent re-picked it (`resumedByTokenId`).
+- **Agent activity** — "went dark" indicator derived from `lastUsedAt`.
 
-## Security (§11.1, §11.4 start)
-- Per-function workspace assertions already in place; add **role gates** for destructive ops + member-only actions.
-- Begin rate-limiting groundwork (full limits in Phase 6): wrap `create_task` with the reused `@convex-dev/rate-limiter` per token/workspace.
+## Security
+- Per-function **owner assertions** (`userId` + project) already in place (Phase 1) — nothing role-shaped to add (single owner).
+- **Tags are agent/user-supplied strings** → render as text only (never `dangerouslySetInnerHTML`); cap length/count (stored-XSS + abuse surface).
+- Begin rate-limiting groundwork (full limits in Phase 6): wrap `create_task` with the reused `@convex-dev/rate-limiter` per **token / user**.
 
 ## Testing
-- Two agents + two humans on one board: attribution correct; assignment routes notifications.
-- **Claim race:** two humans open the same card; one wins, the other sees "taken/steal" (no silent failure).
-- A `member` cannot approve a destructive op; an `owner` can.
-- Presence shows/clears correctly on tab close (ghost tolerance noted).
+- Two agent tokens on one project: attribution correct; each card shows the right agent name.
+- Tag filter: tasks tagged `feature-x` filter correctly; the distinct-tag list is accurate; tag normalization holds (dupes/case collapsed).
+- A `tasks:read`-only token cannot create/resolve (scope enforced); a writer can.
+- Agent last-seen updates on each call; "went dark" appears after idle.
 
 ## Definition of Done
-- [ ] Invite a teammate; both see the same live board with presence.
-- [ ] Cards show which agent raised them and who's working them.
-- [ ] Claim conflicts resolved in-UI; assignment + assignee-scoped notifications work.
-- [ ] Role-gated destructive approvals enforced server-side; `taskAudit` records decisions.
-- [ ] Board search/filter usable on a busy board.
+- [ ] Multiple agent tokens write to one project; each card shows which agent raised it.
+- [ ] Tickets are taggable; the board filters by tag (+ agent / type / status).
+- [ ] Read-only vs writer token scopes enforced server-side; `taskAudit` records decisions.
+- [ ] Agent last-seen / "went dark" visible.
 
 ## Risks / watch-outs
-- Presence is easy to get subtly wrong (ghosts on tab-close) — keep it a *soft* signal; `claim` is the hard lock.
-- Don't let role logic live only in the UI — enforce in Convex.
-- Reactive fan-out grows with members × cards; measure board query cost (optimize in Phase 7).
+- **Multi-user is OUT for now** — don't build members/roles/invites/presence/assignment. Park it; revisit only if real teams ask (Phase 7 After-v1).
+- **Tag sprawl** — normalize + cap; a per-project suggested-tag list can come later.
+- Reactive fan-out grows with card count; measure board query cost (optimize in Phase 7).

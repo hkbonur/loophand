@@ -13,7 +13,7 @@
    - `pushSubscriptions` table (per user/device endpoint + keys).
    - `internal.notify.push(taskId)` action using Web Push + VAPID keys (env). Fired from `tasks.create` (and assignment later), throttled per user.
    - Mutations `push.subscribe` / `push.unsubscribe`.
-3. (Optional) email notify via reused Resend path as fallback.
+3. (Optional) email notify as fallback via **Resend** (loophand's email provider — set up fresh, `RESEND_API_KEY`). Don't mirror formbase's SES stack; wire Resend directly (`@convex-dev/resend` or REST). Magic-link auth email also goes through Resend.
 
 ## MCP
 - No new tools. Document `tool_payload` for `visual_review`: `{ screenshotFileId, viewports?: ["desktop","mobile"] }`. **No live-URL fetch** server-side.
@@ -29,7 +29,7 @@
    If a URL is ever shown, render **client-side in a `sandbox`ed iframe** (no `allow-same-origin`), with a "couldn't reach this URL" fallback — never a server fetch.
 3. **PWA push:** finish the service worker — subscribe to push, handle `push` events → OS notification → deep-link to the card. Permission prompt in onboarding.
 
-## Security (§11.2)
+## Security
 - **SSRF:** screenshots are agent-uploaded; no server-side URL fetch.
 - **Stored-XSS:** render annotation text + instructions as text only; never `dangerouslySetInnerHTML`.
 - Push payloads carry only IDs, not task content.

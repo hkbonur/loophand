@@ -11,21 +11,21 @@
 2. Recruit a handful of Claude Code users for a closed test.
 
 ## Metrics & instrumentation
-- Instrument and dashboard the three numbers from the plan's success criteria:
+- Instrument and dashboard the three core success numbers:
   - **Time-to-first-resolved-task** (onboarding friction).
   - **Tab-retention** (did they come back the next day?).
   - **`await_task` round-trips / re-polls** per task (loop health).
 - Per-tool usage + **frequency** (validate which tools earn their keep before further investment).
-- Add a minimal analytics events table (or reuse formbase analytics).
+- Add loophand's own minimal analytics events table (built fresh — don't wire into formbase's analytics).
 
 ## Distribution — Claude Code plugin + skill
-3. **Claude Code plugin** bundling: the MCP server config (one-click connect, no manual `.mcp.json`), a **skill** encoding the "when to pull in a human" admission filter (§4.5), and **slash commands** (`/ask-human`, `/await-review`). Publish to a marketplace.
+3. **Claude Code plugin** bundling: the MCP server config (one-click connect, no manual `.mcp.json`), a **skill** encoding the "when to pull in a human" admission filter, and **slash commands** (`/ask-human`, `/await-review`). Publish to a marketplace.
 4. **CLI fallback** (thin) for non-MCP environments.
 5. Docs: connect snippet, tool reference, result schemas (`result_version`).
 
 ## Security & compliance pass
-6. Run the **§11 checklist** end-to-end as a release gate:
-   - Per-function workspace assertions + scope on **every** tool (automated test that fuzzes foreign IDs).
+6. Run the **security checklist** end-to-end as a release gate:
+   - Per-function owner assertions (`userId` + `projectId`) + scope on **every** tool (automated test that fuzzes foreign IDs across users and projects).
    - `fetch_file` IDOR test (no raw-key access, no cross-tenant).
    - SSRF (no server URL fetch), stored-XSS (agent strings as text, sandboxed SVG/PDF), `frame-ancestors 'none'`.
    - Rate limits + quotas under load.
@@ -39,15 +39,15 @@
 - [ ] A dev runs a real multi-hour loop, resolves tasks in-flow, and **returns the next day** (tab-retention > 0 in the cohort).
 - [ ] Metrics dashboards live (TTF-resolved-task, retention, round-trips, per-tool frequency).
 - [ ] Claude Code plugin installable from a marketplace; CLI fallback works.
-- [ ] §11 security checklist passes as a release gate; external review clean.
+- [ ] Security checklist (above) passes as a release gate; external review clean.
 - [ ] Busy-board performance acceptable; push reliable on the target matrix.
 
 ## Risks / watch-outs
-- **Frequency is the real uncertainty** (per the verdict): if artifact work is rare per session, retention suffers — let the metrics decide whether to deepen tools or double down on the high-frequency approval/visual-review path.
+- **Frequency is the real uncertainty:** if artifact work is rare per session, retention suffers — let the metrics decide whether to deepen tools or double down on the high-frequency approval/visual-review path.
 - A bigger player could absorb the basic loop — lean on depth (work-surfaces) + the OSS-core/plugin distribution as the moat.
 - Don't gate launch on every tool; the approval + visual-review loop is the wedge.
 
 ---
 
-## After v1 (parked, from the plan)
-Native mobile apps · public tool-SDK / marketplace · full audit/provenance · **human-gated ephemeral credential grants** (scoped, short-lived, never a standing vault) · on-prem/self-host tier (Convex is self-hostable).
+## After v1 (parked)
+**Multi-user / teams** (workspaces, members, roles, invites, presence, card assignment — everything dropped from Phase 4) · native mobile apps · public tool-SDK / marketplace · full audit/provenance · **human-gated ephemeral credential grants** (scoped, short-lived, never a standing vault) · on-prem/self-host tier (Convex is self-hostable).

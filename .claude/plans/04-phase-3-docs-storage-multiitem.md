@@ -9,8 +9,8 @@
 ## Backend (Convex)
 
 1. **Artifact outputs via R2 (`managedFiles`/`managedFileReferences`):**
-   - Store each output object under a **random UUID** key (formbase pattern). The **stable name** (`outputName`/`item-{n}.{ext}`) is a `managedFileReferences` row keyed by `(taskId, name)`. **Never** put workspace/task ids in the R2 key.
-   - `fetch_file(task_id, name)` HTTP endpoint: resolve name → file via reference rows, assert workspace + `tasks:read`, return a **short-TTL signed URL**. Never accepts a raw key.
+   - Store each output object under a **random UUID** key (formbase's `generateR2Key()` → `crypto.randomUUID()`). The **stable name** (`outputName`/`item-{n}.{ext}`) is a `managedFileReferences` row. **Match formbase's actual shape:** that table keys on `(ownerType, ownerKey)` — set `ownerType:"task"` (or `"taskItem"`) and encode the stable name in `ownerKey` (e.g. `` `${taskId}/${name}` ``); it does **not** have separate `taskId`/`name` columns. **Never** put user/project/task ids in the R2 key itself.
+   - `fetch_file(task_id, name)` (⚠ rename `get_file` or extend `ALLOWED_VERBS` — `fetch` is not a permitted verb) HTTP endpoint: resolve name → reference row → file, assert **owner** (`userId` + the task's project) + `tasks:read`, return access. **Note:** formbase doesn't hand out short-TTL signed URLs to clients — `http/storage.ts` is a **302-proxy** that mints a fresh signed URL (default `SIGNED_URL_TTL_SECONDS = 3600`) per request behind a stable proxy URL. Either reuse that proxy (authenticated for tasks) or mint a short-TTL signed URL directly; pick one and state it. Never accept a raw R2 key.
 2. **Multi-item:**
    - `taskItems` create on `tasks.create` when `items[]` is supplied; `itemCount` set.
    - `items.setStatus(itemId, status, result?, resultFileId?)` — writes the item **and** bumps `tasks.itemsDone` **in the same mutation** (OCC-retry safe). Auto-`complete` the task when `itemsDone === itemCount`.
@@ -26,21 +26,20 @@
 
 1. **`ItemRail` primitive:** bottom filmstrip; per-item state (done/pending/failed/skipped); keyboard `[`/`]`; running `itemsDone/itemCount` chip; **Apply to all** + **Submit batch**. Surface-agnostic (used by doc + image tools).
 2. **`DocRender` tool:** render react-pdf / FOP output to a **PDF.js** canvas (`pdfjs` dep) with a page-thumbnail rail; overlay the **reused `AnnotationCanvas`**; **render-error fallback** (raw-download). On approve, store the rendered PDF as the card's output.
-3. **Conflict / loading states (from review):**
+3. **Loading / staleness states:**
    - "Agent still attaching…" — gate the tool surface on attachment readiness, not just task existence.
-   - Stale-task banner — if the task changed/expired/was cancelled under an open dialog (driven by the same reactive `useQuery`).
-   - Claim-rejected → "taken by X / steal" (full conflict UI lands Phase 4; stub here).
+   - Stale-task banner — if the task was resolved/expired/cancelled (or moved to `resumed`) under an open dialog (driven by the same reactive `useQuery`).
 
 **Deps added:** `@react-pdf/renderer`, `pdfjs-dist`.
 
 ## Security
 - The **stable-key IDOR is closed** (random UUID + authenticated `fetch_file`).
 - FOP hardening (entities/network off) if used.
-- Signed URLs are short-TTL and workspace-scoped.
+- Signed URLs are short-TTL and owner-scoped (`userId` + project).
 
 ## Testing
 - Multi-item: 5-item doc task → review/annotate each → submit → `itemsDone` consistent under concurrent item writes (race test).
-- `fetch_file` returns only the caller's workspace files; foreign `task_id`/`name` rejected; raw-key access impossible.
+- `fetch_file` returns only the caller's own files (`userId`-scoped); foreign `task_id`/`name` rejected; raw-key access impossible.
 - Render-error path shows fallback, not a crash.
 
 ## Definition of Done
@@ -50,6 +49,6 @@
 - [ ] "Agent still attaching" + stale-task states behave.
 
 ## Risks / watch-outs
-- Don't reintroduce a deterministic R2 key "for convenience" — that's the IDOR the review caught.
+- Don't reintroduce a deterministic R2 key "for convenience" — that's an IDOR (guessable cross-user/project keys).
 - PDF.js + react-pdf are heavy; lazy-load. Large/many-page PDFs need virtualization.
 - Keep `ItemRail` generic so the image studio (Phase 6) reuses it unchanged.

@@ -192,3 +192,100 @@ describe("visual_review human view", () => {
     expect(view?.screenshotUrl).toBeNull();
   });
 });
+
+describe("visual_review resolve → agent round-trip", () => {
+  async function openVisualReview(t: ReturnType<typeof convexTest>, r2Key: string) {
+    const { userId, tokenId } = await setupOwner(t, "owner@example.com");
+    const fileId = await uploadScreenshot(t, userId, r2Key);
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId,
+      tokenId,
+      type: "visual_review",
+      title: "v",
+      instructions: "x",
+      toolPayload: { screenshotFileId: fileId },
+    });
+    return { userId, tokenId, taskId: task.task_id };
+  }
+
+  test("box + pen-sketch annotations survive to the agent's get_task", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId, taskId } = await openVisualReview(t, "roundtripkey000001");
+    const annotations = [
+      { shape: "box" as const, points: [10, 10, 100, 50], viewport: "desktop" as const, severity: "blocker" as const, comment: "misaligned header" },
+      { shape: "pen" as const, points: [1, 2, 3, 4, 5, 6], viewport: "mobile" as const, severity: "nit" as const, comment: "sketchy edge" },
+    ];
+
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    const resolved = await asOwner.mutation(api.tasks.resolve, {
+      taskId,
+      action: "request_changes",
+      comment: "see notes",
+      revision: 0,
+      annotations,
+    });
+    expect(resolved.outcome).toBe("changes_requested");
+    expect(resolved.result.tool).toBe("visual_review");
+    expect(resolved.result.annotations).toHaveLength(2);
+
+    // The agent reads back the structured feedback verbatim.
+    const agentView = await t.mutation(internal.tasks.consumeForAgent, {
+      userId,
+      tokenId,
+      taskId,
+    });
+    expect(agentView.result.tool).toBe("visual_review");
+    expect(agentView.result.decision).toBe("changes_requested");
+    expect(agentView.result.annotations[1]).toMatchObject({
+      shape: "pen",
+      severity: "nit",
+      comment: "sketchy edge",
+    });
+  });
+
+  test("rejects annotations on an approval task", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId } = await setupOwner(t, "owner@example.com");
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId,
+      tokenId,
+      type: "approval",
+      title: "a",
+      instructions: "x",
+    });
+
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    await expect(
+      asOwner.mutation(api.tasks.resolve, {
+        taskId: task.task_id,
+        action: "approve",
+        revision: 0,
+        annotations: [
+          { shape: "box" as const, points: [0, 0, 1, 1], viewport: "desktop" as const, severity: "nit" as const, comment: "x" },
+        ],
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("approval resolution keeps its plain decision + comment result", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId } = await setupOwner(t, "owner@example.com");
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId,
+      tokenId,
+      type: "approval",
+      title: "a",
+      instructions: "x",
+    });
+
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    const resolved = await asOwner.mutation(api.tasks.resolve, {
+      taskId: task.task_id,
+      action: "approve",
+      comment: "lgtm",
+      revision: 0,
+    });
+    expect(resolved.result).toMatchObject({ decision: "approved", comment: "lgtm" });
+    expect(resolved.result.tool).toBeUndefined();
+  });
+});

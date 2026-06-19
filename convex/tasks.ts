@@ -28,6 +28,19 @@ const toolPayloadValidator = v.object({
   viewports: v.optional(v.array(viewportValidator)),
 });
 
+// One mark the human draws on the screenshot. Shape-agnostic so the canvas can
+// grow (box / arrow / freehand pen / numbered pin) without changing the
+// agent-facing contract. `points` is interpreted per shape: box [x,y,w,h],
+// arrow [x1,y1,x2,y2], pen [x1,y1,x2,y2,…] (a freehand sketch), pin [x,y].
+const annotationValidator = v.object({
+  shape: v.union(v.literal("box"), v.literal("arrow"), v.literal("pen"), v.literal("pin")),
+  points: v.array(v.number()),
+  label: v.optional(v.number()),
+  viewport: viewportValidator,
+  severity: v.union(v.literal("blocker"), v.literal("nit")),
+  comment: v.string(),
+});
+
 // Agent-facing payload — snake_case for MCP ergonomics.
 const agentViewValidator = v.object({
   task_id: v.id("tasks"),
@@ -422,6 +435,7 @@ export const resolve = mutation({
     taskId: v.id("tasks"),
     action: v.union(...RESOLVE_ACTIONS.map((a) => v.literal(a))),
     comment: v.optional(v.string()),
+    annotations: v.optional(v.array(annotationValidator)),
     revision: v.number(),
   },
   returns: taskViewValidator,
@@ -442,14 +456,34 @@ export const resolve = mutation({
         message: "Task changed since you loaded it. Reload and try again.",
       });
     }
+    if (args.annotations && args.annotations.length > 0 && task.type !== "visual_review") {
+      throw new ConvexError({
+        code: "VALIDATION_ERROR",
+        message: "annotations are only valid for visual_review tasks.",
+      });
+    }
 
     const mapping = RESOLUTION[args.action];
     const now = Date.now();
+    const resultVersion = task.resultVersion + 1;
+    // visual_review returns tool-tagged, structured feedback (the annotations
+    // the human drew); every other type returns the plain decision + comment.
+    // A cancel always falls back to the plain shape — there's nothing to mark up.
+    const result =
+      task.type === "visual_review" && args.action !== "cancel"
+        ? {
+            result_version: resultVersion,
+            tool: "visual_review" as const,
+            decision: mapping.outcome,
+            annotations: args.annotations ?? [],
+            comment: args.comment ?? null,
+          }
+        : { decision: mapping.outcome, comment: args.comment ?? null };
     await ctx.db.patch(args.taskId, {
       status: mapping.status,
       outcome: mapping.outcome,
-      result: { decision: mapping.outcome, comment: args.comment ?? null },
-      resultVersion: task.resultVersion + 1,
+      result,
+      resultVersion,
       revision: task.revision + 1,
       updatedAt: now,
     });

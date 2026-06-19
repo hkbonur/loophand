@@ -39,10 +39,12 @@
     "better-auth": "^1.6.19",
     "clsx": "^2.1.1",
     "convex": "^1.41.0",
+    "konva": "^10.3.0",
     "oxfmt": "^0.55.0",
     "oxlint": "^1.70.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-konva": "^19.2.5",
     "sonner": "^2.0.7",
     "tailwindcss": "^4.1.18",
     "zod": "^4.4.3"

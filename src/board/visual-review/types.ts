@@ -1,0 +1,34 @@
+// Frontend mirror of the visual_review annotation contract the backend stores
+// and returns to the agent (convex/tasks.ts `annotationValidator`). Kept in sync
+// by hand — the backend is the source of truth.
+
+export type AnnotationShape = "box" | "arrow" | "pen" | "pin";
+export type Severity = "blocker" | "nit";
+export type Viewport = "desktop" | "mobile";
+
+// The wire shape sent in `tasks.resolve({ annotations })`. `points` is
+// interpreted per shape: box [x,y,w,h], arrow [x1,y1,x2,y2],
+// pen [x1,y1,x2,y2,…] (a freehand sketch), pin [x,y]. All coordinates are in
+// the screenshot's natural pixel space, independent of display scale.
+export interface Annotation {
+  shape: AnnotationShape;
+  points: number[];
+  label?: number;
+  viewport: Viewport;
+  severity: Severity;
+  comment: string;
+}
+
+// A mark while it lives on the canvas: an annotation plus a local id used only
+// for editing/selection (stripped before submit).
+export interface Mark extends Annotation {
+  id: string;
+}
+
+// The active drawing tool. "select" edits existing marks without drawing.
+export type Tool = "select" | AnnotationShape;
+
+export const VIEWPORT_WIDTH: Record<Viewport, number> = {
+  desktop: 1280,
+  mobile: 375,
+};

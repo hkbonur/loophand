@@ -1,6 +1,7 @@
-// One source of truth for task-type vocabulary. v1 ships `approval`; later
-// phases add visual_review / doc_review / input / choice / sketch / image / diff.
-export const TASK_TYPES = ["approval"] as const;
+// One source of truth for task-type vocabulary. `approval` ships first;
+// `visual_review` (annotate a screenshot) lands in Phase 2. Later phases add
+// doc_review / input / choice / sketch / image / diff.
+export const TASK_TYPES = ["approval", "visual_review"] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
 
 export function isTaskType(value: string): value is TaskType {

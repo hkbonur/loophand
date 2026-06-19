@@ -25,6 +25,16 @@ export const TASK_OUTCOMES = [
 ] as const;
 const taskOutcome = v.union(...TASK_OUTCOMES.map((o) => v.literal(o)));
 
+// visual_review input: the screenshot the human annotates plus which viewports
+// to offer. A fixed shape — typed here (not `v.any()`) and reused by the create
+// tool. Widen to a discriminated union once a second tool type carries its own
+// payload (doc_review / input / …).
+export const viewportValidator = v.union(v.literal("desktop"), v.literal("mobile"));
+export const toolPayloadValidator = v.object({
+  screenshotFileId: v.id("managedFiles"),
+  viewports: v.optional(v.array(viewportValidator)),
+});
+
 export default defineSchema({
   // ── Foundation ───────────────────────────────────────────────────────────
 
@@ -151,6 +161,9 @@ export default defineSchema({
     outcome: v.optional(taskOutcome),
     // Result payload returned to the agent on resolve (arbitrary JSON).
     result: v.optional(v.any()),
+    // Tool input the agent supplied at create time (e.g. visual_review carries
+    // `{ screenshotFileId, viewports }`). Shape is validated in the tool layer.
+    toolPayload: v.optional(v.any()),
     resultVersion: v.number(),
     // Optimistic-concurrency guard against double-resolution.
     revision: v.number(),

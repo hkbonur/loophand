@@ -10,6 +10,7 @@
 
 import type * as apiTokens from "../apiTokens.js";
 import type * as crons from "../crons.js";
+import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as http_auth from "../http/auth.js";
 import type * as http_mcp from "../http/mcp.js";
@@ -33,6 +34,7 @@ import type * as http_mcp_tools_tasks_getTask from "../http/mcp/tools/tasks/getT
 import type * as http_mcp_tools_tasks_index from "../http/mcp/tools/tasks/index.js";
 import type * as http_mcp_tools_tasks_listProjects from "../http/mcp/tools/tasks/listProjects.js";
 import type * as http_mcp_tools_tasks_listTasks from "../http/mcp/tools/tasks/listTasks.js";
+import type * as http_mcp_tools_tasks_uploadScreenshot from "../http/mcp/tools/tasks/uploadScreenshot.js";
 import type * as http_mcp_types from "../http/mcp/types.js";
 import type * as http_storage from "../http/storage.js";
 import type * as lib_apiTokenAuth from "../lib/apiTokenAuth.js";
@@ -44,6 +46,7 @@ import type * as lib_logger from "../lib/logger.js";
 import type * as lib_ownership from "../lib/ownership.js";
 import type * as lib_projectHelpers from "../lib/projectHelpers.js";
 import type * as lib_r2 from "../lib/r2.js";
+import type * as lib_screenshots from "../lib/screenshots.js";
 import type * as lib_taskConstants from "../lib/taskConstants.js";
 import type * as lib_taskViews from "../lib/taskViews.js";
 import type * as projects from "../projects.js";
@@ -61,6 +64,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   apiTokens: typeof apiTokens;
   crons: typeof crons;
+  files: typeof files;
   http: typeof http;
   "http/auth": typeof http_auth;
   "http/mcp": typeof http_mcp;
@@ -84,6 +88,7 @@ declare const fullApi: ApiFromModules<{
   "http/mcp/tools/tasks/index": typeof http_mcp_tools_tasks_index;
   "http/mcp/tools/tasks/listProjects": typeof http_mcp_tools_tasks_listProjects;
   "http/mcp/tools/tasks/listTasks": typeof http_mcp_tools_tasks_listTasks;
+  "http/mcp/tools/tasks/uploadScreenshot": typeof http_mcp_tools_tasks_uploadScreenshot;
   "http/mcp/types": typeof http_mcp_types;
   "http/storage": typeof http_storage;
   "lib/apiTokenAuth": typeof lib_apiTokenAuth;
@@ -95,6 +100,7 @@ declare const fullApi: ApiFromModules<{
   "lib/ownership": typeof lib_ownership;
   "lib/projectHelpers": typeof lib_projectHelpers;
   "lib/r2": typeof lib_r2;
+  "lib/screenshots": typeof lib_screenshots;
   "lib/taskConstants": typeof lib_taskConstants;
   "lib/taskViews": typeof lib_taskViews;
   projects: typeof projects;

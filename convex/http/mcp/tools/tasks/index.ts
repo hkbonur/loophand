@@ -6,6 +6,7 @@ import { cancelTaskTool } from "./cancelTask";
 import { listTasksTool } from "./listTasks";
 import { listProjectsTool } from "./listProjects";
 import { createProjectTool } from "./createProject";
+import { uploadScreenshotTool } from "./uploadScreenshot";
 
 export const taskTools: McpTool[] = [
   createTaskTool,
@@ -15,4 +16,5 @@ export const taskTools: McpTool[] = [
   listTasksTool,
   listProjectsTool,
   createProjectTool,
+  uploadScreenshotTool,
 ];

@@ -18,3 +18,14 @@ export function isValidR2Key(key: string): boolean {
 export function generateR2Key(): string {
   return crypto.randomUUID().replace(/-/g, "");
 }
+
+// Permanent, embeddable URL for a stored blob. Points at the storage proxy on
+// the Convex site domain (`registerStorageRoutes`), which signs a fresh R2 URL
+// per request. CONVEX_SITE_URL is injected automatically in every deployed
+// Convex function; we throw if it's missing rather than emit a relative URL
+// that would silently break board image embeds.
+export function storageProxyUrl(r2Key: string): string {
+  const base = process.env.CONVEX_SITE_URL;
+  if (!base) throw new Error("CONVEX_SITE_URL is not set; cannot build a storage URL.");
+  return `${base}/api/storage/${r2Key}`;
+}

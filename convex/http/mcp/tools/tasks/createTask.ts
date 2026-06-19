@@ -11,7 +11,9 @@ const schema = z.object({
     .string()
     .optional()
     .describe("Existing project id or name. Omit to use your default board."),
-  type: z.enum(TASK_TYPES).describe('Task type. v1 supports "approval".'),
+  type: z
+    .enum(TASK_TYPES)
+    .describe('Task type: "approval" (decide) or "visual_review" (annotate a screenshot).'),
   title: z.string().min(1).describe("Short card title shown on the board."),
   instructions: z.string().min(1).describe("What you want the human to review or decide."),
   acceptance_criteria: z
@@ -22,6 +24,18 @@ const schema = z.object({
     .array(z.string())
     .optional()
     .describe("Labels for grouping/filtering within the project."),
+  tool_payload: z
+    .object({
+      screenshot_file_id: z
+        .string()
+        .describe("A file_id from upload_screenshot — the image the human annotates."),
+      viewports: z
+        .array(z.enum(["desktop", "mobile"]))
+        .optional()
+        .describe("Viewports to offer in the review; defaults to desktop."),
+    })
+    .optional()
+    .describe("Required for a visual_review task: the screenshot to annotate (upload it first)."),
   idempotency_key: z
     .string()
     .optional()
@@ -58,6 +72,12 @@ export const createTaskTool = defineTool({
         instructions: input.instructions,
         acceptanceCriteria: input.acceptance_criteria,
         tags: input.tags,
+        toolPayload: input.tool_payload
+          ? {
+              screenshotFileId: input.tool_payload.screenshot_file_id,
+              viewports: input.tool_payload.viewports,
+            }
+          : undefined,
         idempotencyKey: input.idempotency_key,
         ttlSeconds: input.ttl_seconds,
       },

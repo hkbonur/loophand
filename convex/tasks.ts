@@ -12,11 +12,39 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { requireAuth } from "./lib/auth";
 import { assertOwnedTask, assertOwnedProject } from "./lib/ownership";
 import { ensureDefaultProject, findProjectByName } from "./lib/projectHelpers";
-import { TASK_STATUSES, TASK_OUTCOMES } from "./schema";
-import { isTaskType, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
+import { assertUploadOwnedBy, attachUploadToTask } from "./files";
+import { storageProxyUrl } from "./lib/r2";
+import {
+  TASK_STATUSES,
+  TASK_OUTCOMES,
+  viewportValidator,
+  toolPayloadValidator,
+} from "./schema";
+import { isTaskType, TASK_TYPES, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
 
 const statusValidator = v.union(...TASK_STATUSES.map((s) => v.literal(s)));
 const outcomeValidator = v.union(...TASK_OUTCOMES.map((o) => v.literal(o)));
+
+// Create-time payload: the agent passes the screenshot id as a raw string,
+// which createForAgent normalizes and ownership-checks before storing it as the
+// typed `toolPayloadValidator` shape.
+const toolPayloadInputValidator = v.object({
+  screenshotFileId: v.string(),
+  viewports: v.optional(v.array(viewportValidator)),
+});
+
+// One mark the human draws on the screenshot. Shape-agnostic so the canvas can
+// grow (box / arrow / freehand pen / numbered pin) without changing the
+// agent-facing contract. `points` is interpreted per shape: box [x,y,w,h],
+// arrow [x1,y1,x2,y2], pen [x1,y1,x2,y2,…] (a freehand sketch), pin [x,y].
+const annotationValidator = v.object({
+  shape: v.union(v.literal("box"), v.literal("arrow"), v.literal("pen"), v.literal("pin")),
+  points: v.array(v.number()),
+  label: v.optional(v.number()),
+  viewport: viewportValidator,
+  severity: v.union(v.literal("blocker"), v.literal("nit")),
+  comment: v.string(),
+});
 
 // Agent-facing payload — snake_case for MCP ergonomics.
 const agentViewValidator = v.object({
@@ -43,6 +71,10 @@ const taskViewValidator = v.object({
   status: statusValidator,
   outcome: v.union(outcomeValidator, v.null()),
   result: v.any(),
+  // Tool input echoed for the board (e.g. visual_review's screenshot + viewports).
+  toolPayload: v.union(toolPayloadValidator, v.null()),
+  // Resolved storage-proxy URL for the visual_review screenshot, or null.
+  screenshotUrl: v.union(v.string(), v.null()),
   resultVersion: v.number(),
   revision: v.number(),
   createdByTokenId: v.union(v.id("apiTokens"), v.null()),
@@ -85,6 +117,27 @@ function toTaskView(task: Doc<"tasks">) {
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
     expiresAt: task.expiresAt ?? null,
+  };
+}
+
+// Turn a stored screenshot reference into an embeddable proxy URL for the board.
+async function resolveScreenshotUrl(
+  ctx: QueryCtx | MutationCtx,
+  toolPayload: Doc<"tasks">["toolPayload"],
+): Promise<string | null> {
+  if (!toolPayload) return null;
+  const fileId: Id<"managedFiles"> = toolPayload.screenshotFileId;
+  const file = await ctx.db.get(fileId);
+  return file ? storageProxyUrl(file.r2Key) : null;
+}
+
+// The board view plus the fields that need a lookup: the tool payload and its
+// resolved screenshot URL.
+async function enrichTaskView(ctx: QueryCtx | MutationCtx, task: Doc<"tasks">) {
+  return {
+    ...toTaskView(task),
+    toolPayload: task.toolPayload ?? null,
+    screenshotUrl: await resolveScreenshotUrl(ctx, task.toolPayload),
   };
 }
 
@@ -148,6 +201,7 @@ export const createForAgent = internalMutation({
     instructions: v.string(),
     acceptanceCriteria: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+    toolPayload: v.optional(toolPayloadInputValidator),
     idempotencyKey: v.optional(v.string()),
     ttlSeconds: v.optional(v.number()),
   },
@@ -156,7 +210,22 @@ export const createForAgent = internalMutation({
     if (!isTaskType(args.type)) {
       throw new ConvexError({
         code: "VALIDATION_ERROR",
-        message: `Unsupported task type "${args.type}". Supported: approval.`,
+        message: `Unsupported task type "${args.type}". Supported: ${TASK_TYPES.join(", ")}.`,
+      });
+    }
+
+    // A visual_review must carry a screenshot; no other type accepts a payload.
+    if (args.type === "visual_review" && !args.toolPayload?.screenshotFileId) {
+      throw new ConvexError({
+        code: "VALIDATION_ERROR",
+        message:
+          "visual_review requires tool_payload.screenshotFileId — upload one with upload_screenshot first.",
+      });
+    }
+    if (args.type !== "visual_review" && args.toolPayload) {
+      throw new ConvexError({
+        code: "VALIDATION_ERROR",
+        message: `tool_payload is only valid for visual_review tasks, not "${args.type}".`,
       });
     }
 
@@ -172,6 +241,18 @@ export const createForAgent = internalMutation({
     }
 
     const projectId = await resolveProjectRef(ctx, args.userId, args.project);
+
+    // Resolve the screenshot before inserting so an invalid/unowned file id
+    // never produces a half-formed task. (After the idempotency check, so a
+    // retry doesn't trip over its own already-consumed upload claim.)
+    const screenshotFile =
+      args.type === "visual_review" && args.toolPayload
+        ? await assertUploadOwnedBy(ctx, args.userId, args.toolPayload.screenshotFileId)
+        : null;
+    const toolPayload = screenshotFile
+      ? { screenshotFileId: screenshotFile._id, viewports: args.toolPayload?.viewports }
+      : undefined;
+
     const now = Date.now();
     const expiresAt =
       args.ttlSeconds && args.ttlSeconds > 0 ? now + args.ttlSeconds * 1000 : undefined;
@@ -186,6 +267,7 @@ export const createForAgent = internalMutation({
       acceptanceCriteria: args.acceptanceCriteria,
       tags: args.tags ?? [],
       status: "open",
+      toolPayload,
       resultVersion: 0,
       revision: 0,
       idempotencyKey: args.idempotencyKey,
@@ -193,6 +275,8 @@ export const createForAgent = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    if (screenshotFile) await attachUploadToTask(ctx, screenshotFile, taskId);
 
     await ctx.db.insert("taskActivity", {
       taskId,
@@ -319,7 +403,8 @@ export const list = query({
       .query("tasks")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
-    return rows.sort((a, b) => b.createdAt - a.createdAt).map(toTaskView);
+    const sorted = rows.sort((a, b) => b.createdAt - a.createdAt);
+    return Promise.all(sorted.map((task) => enrichTaskView(ctx, task)));
   },
 });
 
@@ -329,7 +414,7 @@ export const get = query({
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
     const task = await assertOwnedTask(ctx, args.taskId, userId);
-    return toTaskView(task);
+    return enrichTaskView(ctx, task);
   },
 });
 
@@ -348,6 +433,7 @@ export const resolve = mutation({
     taskId: v.id("tasks"),
     action: v.union(...RESOLVE_ACTIONS.map((a) => v.literal(a))),
     comment: v.optional(v.string()),
+    annotations: v.optional(v.array(annotationValidator)),
     revision: v.number(),
   },
   returns: taskViewValidator,
@@ -368,14 +454,34 @@ export const resolve = mutation({
         message: "Task changed since you loaded it. Reload and try again.",
       });
     }
+    if (args.annotations && args.annotations.length > 0 && task.type !== "visual_review") {
+      throw new ConvexError({
+        code: "VALIDATION_ERROR",
+        message: "annotations are only valid for visual_review tasks.",
+      });
+    }
 
     const mapping = RESOLUTION[args.action];
     const now = Date.now();
+    const resultVersion = task.resultVersion + 1;
+    // visual_review returns tool-tagged, structured feedback (the annotations
+    // the human drew); every other type returns the plain decision + comment.
+    // A cancel always falls back to the plain shape — there's nothing to mark up.
+    const result =
+      task.type === "visual_review" && args.action !== "cancel"
+        ? {
+            result_version: resultVersion,
+            tool: "visual_review" as const,
+            decision: mapping.outcome,
+            annotations: args.annotations ?? [],
+            comment: args.comment ?? null,
+          }
+        : { decision: mapping.outcome, comment: args.comment ?? null };
     await ctx.db.patch(args.taskId, {
       status: mapping.status,
       outcome: mapping.outcome,
-      result: { decision: mapping.outcome, comment: args.comment ?? null },
-      resultVersion: task.resultVersion + 1,
+      result,
+      resultVersion,
       revision: task.revision + 1,
       updatedAt: now,
     });
@@ -391,7 +497,7 @@ export const resolve = mutation({
     });
     const updated = await ctx.db.get(args.taskId);
     if (!updated) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
-    return toTaskView(updated);
+    return enrichTaskView(ctx, updated);
   },
 });
 

@@ -37,6 +37,7 @@ const CORE_TOOL_NAMES = new Set<string>([
   "list_tasks",
   "list_projects",
   "create_project",
+  "upload_screenshot",
 ]);
 
 const CORE_TOOLS = ALL_TOOLS.filter((t) => CORE_TOOL_NAMES.has(t.name));

@@ -1,5 +1,6 @@
-import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { v, ConvexError } from "convex/values";
+import { internalMutation, type MutationCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 
 // How long an uploaded-but-unreferenced blob is held before the cleanup cron
 // reclaims it. The upload is "claimed" the moment a task references it
@@ -36,3 +37,45 @@ export const registerUpload = internalMutation({
     return fileId;
   },
 });
+
+// Resolve a caller-supplied screenshot file id to an owned, still-unclaimed
+// upload. A bad id, a missing blob, or a claim owned by a different user all
+// surface the same NOT_FOUND so a caller can't probe for others' files.
+export async function assertUploadOwnedBy(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  rawFileId: string,
+): Promise<Doc<"managedFiles">> {
+  const notFound = () =>
+    new ConvexError({ code: "NOT_FOUND", message: "Screenshot file not found." });
+  const fileId = ctx.db.normalizeId("managedFiles", rawFileId);
+  if (!fileId) throw notFound();
+  const file = await ctx.db.get(fileId);
+  if (!file) throw notFound();
+  const claim = await ctx.db
+    .query("pendingR2Uploads")
+    .withIndex("by_r2Key", (q) => q.eq("r2Key", file.r2Key))
+    .first();
+  if (!claim || claim.userId !== userId) throw notFound();
+  return file;
+}
+
+// Bind an uploaded blob to a task and consume its uploader claim. After this a
+// re-reference of the same file fails ownership — one upload, one task.
+export async function attachUploadToTask(
+  ctx: MutationCtx,
+  file: Doc<"managedFiles">,
+  taskId: Id<"tasks">,
+): Promise<void> {
+  await ctx.db.insert("managedFileReferences", {
+    fileId: file._id,
+    ownerType: "task",
+    ownerId: taskId,
+    createdAt: Date.now(),
+  });
+  const claim = await ctx.db
+    .query("pendingR2Uploads")
+    .withIndex("by_r2Key", (q) => q.eq("r2Key", file.r2Key))
+    .first();
+  if (claim) await ctx.db.delete(claim._id);
+}

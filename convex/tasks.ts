@@ -12,11 +12,20 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { requireAuth } from "./lib/auth";
 import { assertOwnedTask, assertOwnedProject } from "./lib/ownership";
 import { ensureDefaultProject, findProjectByName } from "./lib/projectHelpers";
+import { assertUploadOwnedBy, attachUploadToTask } from "./files";
 import { TASK_STATUSES, TASK_OUTCOMES } from "./schema";
 import { isTaskType, TASK_TYPES, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
 
 const statusValidator = v.union(...TASK_STATUSES.map((s) => v.literal(s)));
 const outcomeValidator = v.union(...TASK_OUTCOMES.map((o) => v.literal(o)));
+
+// visual_review input: the screenshot the human annotates, plus which viewports
+// to show. Validated here; stored on the task's `toolPayload`.
+const viewportValidator = v.union(v.literal("desktop"), v.literal("mobile"));
+const toolPayloadValidator = v.object({
+  screenshotFileId: v.string(),
+  viewports: v.optional(v.array(viewportValidator)),
+});
 
 // Agent-facing payload — snake_case for MCP ergonomics.
 const agentViewValidator = v.object({
@@ -148,6 +157,7 @@ export const createForAgent = internalMutation({
     instructions: v.string(),
     acceptanceCriteria: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+    toolPayload: v.optional(toolPayloadValidator),
     idempotencyKey: v.optional(v.string()),
     ttlSeconds: v.optional(v.number()),
   },
@@ -157,6 +167,21 @@ export const createForAgent = internalMutation({
       throw new ConvexError({
         code: "VALIDATION_ERROR",
         message: `Unsupported task type "${args.type}". Supported: ${TASK_TYPES.join(", ")}.`,
+      });
+    }
+
+    // A visual_review must carry a screenshot; no other type accepts a payload.
+    if (args.type === "visual_review") {
+      if (!args.toolPayload?.screenshotFileId) {
+        throw new ConvexError({
+          code: "VALIDATION_ERROR",
+          message: "visual_review requires tool_payload.screenshotFileId — upload one with upload_screenshot first.",
+        });
+      }
+    } else if (args.toolPayload) {
+      throw new ConvexError({
+        code: "VALIDATION_ERROR",
+        message: `tool_payload is only valid for visual_review tasks, not "${args.type}".`,
       });
     }
 
@@ -172,6 +197,18 @@ export const createForAgent = internalMutation({
     }
 
     const projectId = await resolveProjectRef(ctx, args.userId, args.project);
+
+    // Resolve the screenshot before inserting so an invalid/unowned file id
+    // never produces a half-formed task. (After the idempotency check, so a
+    // retry doesn't trip over its own already-consumed upload claim.)
+    const screenshotFile =
+      args.type === "visual_review" && args.toolPayload
+        ? await assertUploadOwnedBy(ctx, args.userId, args.toolPayload.screenshotFileId)
+        : null;
+    const toolPayload = screenshotFile
+      ? { screenshotFileId: screenshotFile._id, viewports: args.toolPayload?.viewports }
+      : undefined;
+
     const now = Date.now();
     const expiresAt =
       args.ttlSeconds && args.ttlSeconds > 0 ? now + args.ttlSeconds * 1000 : undefined;
@@ -186,6 +223,7 @@ export const createForAgent = internalMutation({
       acceptanceCriteria: args.acceptanceCriteria,
       tags: args.tags ?? [],
       status: "open",
+      toolPayload,
       resultVersion: 0,
       revision: 0,
       idempotencyKey: args.idempotencyKey,
@@ -193,6 +231,8 @@ export const createForAgent = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    if (screenshotFile) await attachUploadToTask(ctx, screenshotFile, taskId);
 
     await ctx.db.insert("taskActivity", {
       taskId,

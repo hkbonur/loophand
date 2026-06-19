@@ -151,6 +151,9 @@ export default defineSchema({
     outcome: v.optional(taskOutcome),
     // Result payload returned to the agent on resolve (arbitrary JSON).
     result: v.optional(v.any()),
+    // Tool input the agent supplied at create time (e.g. visual_review carries
+    // `{ screenshotFileId, viewports }`). Shape is validated in the tool layer.
+    toolPayload: v.optional(v.any()),
     resultVersion: v.number(),
     // Optimistic-concurrency guard against double-resolution.
     revision: v.number(),

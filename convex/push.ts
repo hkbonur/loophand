@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, internalQuery, internalMutation } from "./_generated/server";
+import { mutation, query, internalQuery, internalMutation } from "./_generated/server";
 import { requireAuth } from "./lib/auth";
 
 // A browser's Web Push subscription (endpoint + the keys needed to encrypt a
@@ -73,4 +73,23 @@ export const removeDead = internalMutation({
     await ctx.db.delete(args.subscriptionId);
     return null;
   },
+});
+
+// Who to notify for a task: its owner + project. Returns null if the task is
+// gone (the scheduled notify is best-effort).
+export const taskNotifyTarget = internalQuery({
+  args: { taskId: v.id("tasks") },
+  returns: v.union(v.object({ userId: v.id("users"), projectId: v.id("projects") }), v.null()),
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    return task ? { userId: task.userId, projectId: task.projectId } : null;
+  },
+});
+
+// The VAPID public key the browser needs to subscribe. Public by design (it's
+// the server's identity, not a secret); null when push isn't configured.
+export const publicKey = query({
+  args: {},
+  returns: v.union(v.string(), v.null()),
+  handler: async () => process.env.VAPID_PUBLIC_KEY ?? null,
 });

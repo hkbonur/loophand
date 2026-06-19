@@ -1,0 +1,57 @@
+import React from "react";
+import { Copy, Check } from "lucide-react";
+import { toast } from "../ui/toaster";
+
+const MCP_URL = `${import.meta.env.VITE_CONVEX_SITE_URL ?? ""}/api/mcp`;
+
+interface Props {
+  apiKey?: string;
+}
+
+function buildConfig(key: string): string {
+  return JSON.stringify(
+    {
+      mcpServers: {
+        loophand: {
+          type: "http",
+          url: MCP_URL,
+          headers: { Authorization: `Bearer ${key}` },
+        },
+      },
+    },
+    null,
+    2,
+  );
+}
+
+export function ConnectSnippet(props: Props) {
+  const [copied, setCopied] = React.useState(false);
+  const config = buildConfig(props.apiKey ?? "<YOUR_API_KEY>");
+
+  const copy = React.useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(config);
+      setCopied(true);
+      toast.success("Copied .mcp.json snippet.");
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Copy failed — select and copy manually.");
+    }
+  }, [config]);
+
+  return (
+    <div className="relative w-full max-w-xl">
+      <button
+        type="button"
+        onClick={copy}
+        aria-label="Copy snippet"
+        className="absolute right-3 top-3 rounded-md border border-[var(--line)] bg-[var(--surface)] p-1.5 text-[var(--sea-ink-soft)] transition hover:text-[var(--sea-ink)]"
+      >
+        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      </button>
+      <pre className="overflow-auto rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 text-left font-mono text-xs text-[var(--sea-ink)]">
+        {config}
+      </pre>
+    </div>
+  );
+}

@@ -1,10 +1,10 @@
 import React from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
-import { BoardPage } from "../board/BoardPage";
+import { AgentsPanel } from "../settings/AgentsPanel";
 import { Spinner } from "../ui/spinner";
 
-export const Route = createFileRoute("/")({ component: Home });
+export const Route = createFileRoute("/settings/agents")({ component: SettingsAgentsRoute });
 
 function GoLogin() {
   const navigate = useNavigate();
@@ -14,7 +14,7 @@ function GoLogin() {
   return null;
 }
 
-function Home() {
+function SettingsAgentsRoute() {
   return (
     <>
       <AuthLoading>
@@ -26,7 +26,7 @@ function Home() {
         <GoLogin />
       </Unauthenticated>
       <Authenticated>
-        <BoardPage />
+        <AgentsPanel />
       </Authenticated>
     </>
   );

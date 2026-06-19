@@ -1,20 +1,20 @@
 import React from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
-import { BoardPage } from "../board/BoardPage";
+import { AuthLoginPage } from "../auth-ui/auth-login-page";
 import { Spinner } from "../ui/spinner";
 
-export const Route = createFileRoute("/")({ component: Home });
+export const Route = createFileRoute("/login")({ component: LoginRoute });
 
-function GoLogin() {
+function GoBoard() {
   const navigate = useNavigate();
   React.useEffect(() => {
-    void navigate({ to: "/login" });
+    void navigate({ to: "/" });
   }, [navigate]);
   return null;
 }
 
-function Home() {
+function LoginRoute() {
   return (
     <>
       <AuthLoading>
@@ -22,12 +22,12 @@ function Home() {
           <Spinner />
         </div>
       </AuthLoading>
-      <Unauthenticated>
-        <GoLogin />
-      </Unauthenticated>
       <Authenticated>
-        <BoardPage />
+        <GoBoard />
       </Authenticated>
+      <Unauthenticated>
+        <AuthLoginPage />
+      </Unauthenticated>
     </>
   );
 }

@@ -1,0 +1,3 @@
+{
+  "ignorePatterns": ["dist", "node_modules", ".tanstack", ".wrangler", ".claude", "convex/_generated", "src/routeTree.gen.ts"]
+}

@@ -3,3 +3,4 @@ node_modules
 .wrangler
 .tanstack
 .DS_Store
+dist

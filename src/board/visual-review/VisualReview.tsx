@@ -2,13 +2,13 @@ import React from "react";
 import { useMutation } from "convex/react";
 import { Check, X, Ban, MousePointer2, Square, MoveUpRight, Pencil, MapPin, Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
+import { cn } from "../../lib/cn";
 import { Button } from "../../ui/button";
 import { Textarea } from "../../ui/textarea";
 import { Spinner } from "../../ui/spinner";
 import { toast } from "../../ui/toaster";
 import type { TaskView } from "../types";
 import type { Severity, Tool, Viewport } from "./types";
-import { VIEWPORT_WIDTH } from "./types";
 import { useAnnotations, marksToAnnotations } from "./useAnnotations";
 
 // Konva is heavy and browser-only — load the canvas lazily and only on the client.
@@ -29,7 +29,7 @@ const TOOLS: { tool: Tool; label: string; Icon: typeof Square }[] = [
 // On-screen width for each viewport frame: mobile renders at its true 375px,
 // desktop is capped so the screenshot fits the dialog.
 const DISPLAY_WIDTH: Record<Viewport, number> = {
-  mobile: VIEWPORT_WIDTH.mobile,
+  mobile: 375,
   desktop: 560,
 };
 
@@ -131,9 +131,10 @@ export function VisualReview(props: Props) {
           {visibleMarks.map((mark) => (
             <li
               key={mark.id}
-              className={`rounded-xl border p-2 ${
-                mark.id === selectedId ? "border-accent" : "border-border"
-              }`}
+              className={cn(
+                "rounded-xl border p-2",
+                mark.id === selectedId ? "border-accent" : "border-border",
+              )}
               onClick={() => setSelectedId(mark.id)}
             >
               <div className="mb-1.5 flex items-center gap-2">
@@ -206,11 +207,10 @@ function SeverityToggle(props: { value: Severity; onChange: (s: Severity) => voi
     <button
       type="button"
       onClick={() => props.onChange(next)}
-      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-        props.value === "blocker"
-          ? "bg-destructive/10 text-destructive"
-          : "bg-warning/10 text-warning"
-      }`}
+      className={cn(
+        "rounded-full px-2 py-0.5 text-xs font-semibold",
+        props.value === "blocker" ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning",
+      )}
     >
       {props.value === "blocker" ? "Blocker" : "Nit"}
     </button>

@@ -28,11 +28,6 @@ export interface Mark extends Annotation {
 // The active drawing tool. "select" edits existing marks without drawing.
 export type Tool = "select" | AnnotationShape;
 
-export const VIEWPORT_WIDTH: Record<Viewport, number> = {
-  desktop: 1280,
-  mobile: 375,
-};
-
 // The result a resolved visual_review task returns to the agent (and that the
 // board renders read-only). Mirror of the payload tasks.resolve stores.
 export interface VisualReviewResultData {

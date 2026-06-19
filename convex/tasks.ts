@@ -13,7 +13,7 @@ import { requireAuth } from "./lib/auth";
 import { assertOwnedTask, assertOwnedProject } from "./lib/ownership";
 import { ensureDefaultProject, findProjectByName } from "./lib/projectHelpers";
 import { TASK_STATUSES, TASK_OUTCOMES } from "./schema";
-import { isTaskType, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
+import { isTaskType, TASK_TYPES, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
 
 const statusValidator = v.union(...TASK_STATUSES.map((s) => v.literal(s)));
 const outcomeValidator = v.union(...TASK_OUTCOMES.map((o) => v.literal(o)));
@@ -156,7 +156,7 @@ export const createForAgent = internalMutation({
     if (!isTaskType(args.type)) {
       throw new ConvexError({
         code: "VALIDATION_ERROR",
-        message: `Unsupported task type "${args.type}". Supported: approval.`,
+        message: `Unsupported task type "${args.type}". Supported: ${TASK_TYPES.join(", ")}.`,
       });
     }
 

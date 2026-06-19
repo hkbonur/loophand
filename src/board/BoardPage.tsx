@@ -12,6 +12,7 @@ import { CardDialog } from "./CardDialog";
 import { ConnectSnippet } from "./ConnectSnippet";
 import { COLUMNS, type TaskView } from "./types";
 import { toast } from "../ui/toaster";
+import { PushPrompt } from "../pwa/PushPrompt";
 
 function CenteredSpinner(props: { label: string }) {
   return (
@@ -60,6 +61,16 @@ function BoardInner() {
     setActiveProjectId((current) => current ?? projects[0]._id);
   }, [projects]);
 
+  // Open a card deep-linked from a push notification (/?task=<id>), then clean
+  // the URL so a refresh doesn't reopen it.
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const taskParam = new URLSearchParams(window.location.search).get("task");
+    if (!taskParam) return;
+    setSelectedTaskId(taskParam as Id<"tasks">);
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
+
   const tasks = useQuery(api.tasks.list, activeProjectId ? { projectId: activeProjectId } : "skip");
 
   const onCreateProject = React.useCallback(
@@ -100,6 +111,8 @@ function BoardInner() {
           onCreate={onCreateProject}
         />
       </div>
+
+      <PushPrompt />
 
       {tasks !== undefined && tasks.length === 0 ? (
         <Empty

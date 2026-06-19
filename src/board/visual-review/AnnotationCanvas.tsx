@@ -19,6 +19,8 @@ interface Props {
   displayWidth: number;
   viewport: Viewport;
   marks: Mark[];
+  /** Derived pin display numbers, keyed by mark id. */
+  pinLabels: Record<string, number>;
   activeTool: Tool;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
@@ -129,6 +131,7 @@ export function AnnotationCanvas(props: Props) {
           <MarkShape
             key={mark.id}
             mark={mark}
+            label={props.pinLabels[mark.id]}
             stroke={stroke}
             selected={mark.id === props.selectedId}
             onSelect={() => tool === "select" && props.onSelect(mark.id)}
@@ -140,7 +143,13 @@ export function AnnotationCanvas(props: Props) {
   );
 }
 
-function MarkShape(props: { mark: Mark; stroke: number; selected: boolean; onSelect: () => void }) {
+function MarkShape(props: {
+  mark: Mark;
+  label?: number;
+  stroke: number;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   const { mark, stroke, selected } = props;
   const color = SEVERITY_COLOR[mark.severity];
   const dash = selected ? [stroke * 3, stroke * 2] : undefined;
@@ -154,7 +163,9 @@ function MarkShape(props: { mark: Mark; stroke: number; selected: boolean; onSel
     case "arrow":
       return <Arrow {...common} points={mark.points} fill={color} pointerLength={stroke * 4} pointerWidth={stroke * 4} />;
     case "pen":
-      return <Line {...common} points={mark.points} lineCap="round" lineJoin="round" tension={0.3} />;
+      // No tension: render the exact recorded polyline so the painted stroke
+      // matches both the stored points and the live draft (which has none).
+      return <Line {...common} points={mark.points} lineCap="round" lineJoin="round" />;
     case "pin": {
       const [x, y] = mark.points;
       const r = stroke * 6;
@@ -166,7 +177,7 @@ function MarkShape(props: { mark: Mark; stroke: number; selected: boolean; onSel
             y={y - r / 1.5}
             width={r * 2}
             align="center"
-            text={String(mark.label ?? "")}
+            text={String(props.label ?? "")}
             fill="#fff"
             fontSize={r}
             fontStyle="bold"

@@ -1,20 +1,44 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, test } from "vitest";
 import { renderHook, act, cleanup } from "@testing-library/react";
-import { useAnnotations, marksToAnnotations } from "./useAnnotations";
+import { useAnnotations, marksToAnnotations, pinNumbers } from "./useAnnotations";
 import type { Mark } from "./types";
 
 afterEach(() => cleanup());
 
+function pin(id: string, viewport: "desktop" | "mobile"): Mark {
+  return { id, shape: "pin", points: [0, 0], viewport, severity: "blocker", comment: "" };
+}
+
+describe("pinNumbers", () => {
+  test("numbers pins per viewport in order", () => {
+    const marks: Mark[] = [
+      pin("a", "desktop"),
+      pin("b", "mobile"),
+      { id: "c", shape: "box", points: [0, 0, 1, 1], viewport: "desktop", severity: "nit", comment: "" },
+      pin("d", "desktop"),
+    ];
+    expect(pinNumbers(marks)).toEqual({ a: 1, d: 2, b: 1 });
+  });
+
+  test("renumbers with no gaps or duplicates after a delete", () => {
+    // p1,p2,p3 then p2 removed → the survivors are 1 and 2, never a duplicate 3.
+    const survivors: Mark[] = [pin("p1", "desktop"), pin("p3", "desktop")];
+    expect(pinNumbers(survivors)).toEqual({ p1: 1, p3: 2 });
+  });
+});
+
 describe("marksToAnnotations", () => {
-  test("drops the local id and keeps the wire fields", () => {
+  test("strips the id and stamps derived pin labels", () => {
     const marks: Mark[] = [
       { id: "m1", shape: "box", points: [1, 2, 3, 4], viewport: "desktop", severity: "blocker", comment: "x" },
-      { id: "m2", shape: "pin", points: [5, 6], label: 1, viewport: "mobile", severity: "nit", comment: "y" },
+      pin("m2", "desktop"),
+      pin("m3", "mobile"),
     ];
     expect(marksToAnnotations(marks)).toEqual([
       { shape: "box", points: [1, 2, 3, 4], viewport: "desktop", severity: "blocker", comment: "x" },
-      { shape: "pin", points: [5, 6], label: 1, viewport: "mobile", severity: "nit", comment: "y" },
+      { shape: "pin", points: [0, 0], viewport: "desktop", severity: "blocker", comment: "", label: 1 },
+      { shape: "pin", points: [0, 0], viewport: "mobile", severity: "blocker", comment: "", label: 1 },
     ]);
   });
 });
@@ -37,16 +61,22 @@ describe("useAnnotations", () => {
     });
   });
 
-  test("auto-numbers pins in the order they are added", () => {
+  test("pin labels are derived, so deleting one never duplicates a number", () => {
     const { result } = renderHook(() => useAnnotations());
+    const ids: string[] = [];
     act(() => {
-      result.current.addMark({ shape: "pin", points: [1, 1], viewport: "desktop" });
-      result.current.addMark({ shape: "box", points: [0, 0, 1, 1], viewport: "desktop" });
-      result.current.addMark({ shape: "pin", points: [2, 2], viewport: "desktop" });
+      ids.push(result.current.addMark({ shape: "pin", points: [1, 1], viewport: "desktop" }));
+      ids.push(result.current.addMark({ shape: "pin", points: [2, 2], viewport: "desktop" }));
+      ids.push(result.current.addMark({ shape: "pin", points: [3, 3], viewport: "desktop" }));
     });
-    const pins = result.current.marks.filter((m) => m.shape === "pin");
-    expect(pins.map((p) => p.label)).toEqual([1, 2]);
-    expect(result.current.marks.find((m) => m.shape === "box")?.label).toBeUndefined();
+    act(() => result.current.removeMark(ids[1])); // delete the middle pin
+    act(() => {
+      result.current.addMark({ shape: "pin", points: [4, 4], viewport: "desktop" });
+    });
+    const labels = marksToAnnotations(result.current.marks)
+      .filter((a) => a.shape === "pin")
+      .map((a) => a.label);
+    expect(labels).toEqual([1, 2, 3]); // no duplicate 3
   });
 
   test("edits comment and severity, and removes a mark", () => {

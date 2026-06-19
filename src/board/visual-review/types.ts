@@ -19,10 +19,17 @@ export interface Annotation {
   comment: string;
 }
 
-// A mark while it lives on the canvas: an annotation plus a local id used only
-// for editing/selection (stripped before submit).
-export interface Mark extends Annotation {
+// A mark while it lives on the canvas. Carries a local id for editing/selection
+// (stripped before submit). The pin label is NOT stored — it's derived per
+// viewport at render/submit time so deleting a pin never leaves a gap or a
+// duplicate number.
+export interface Mark {
   id: string;
+  shape: AnnotationShape;
+  points: number[];
+  viewport: Viewport;
+  severity: Severity;
+  comment: string;
 }
 
 // The active drawing tool. "select" edits existing marks without drawing.

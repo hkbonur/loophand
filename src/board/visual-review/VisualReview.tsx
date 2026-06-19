@@ -1,6 +1,6 @@
 import React from "react";
 import { useMutation } from "convex/react";
-import { Check, X, Ban, MousePointer2, Square, MoveUpRight, Pencil, MapPin, Trash2 } from "lucide-react";
+import { Check, X, Prohibit, Cursor, Square, ArrowUpRight, Pencil, MapPin, Trash } from "@phosphor-icons/react";
 import { api } from "../../../convex/_generated/api";
 import { cn } from "../../lib/cn";
 import { Button } from "../../ui/button";
@@ -9,7 +9,7 @@ import { Spinner } from "../../ui/spinner";
 import { toast } from "../../ui/toaster";
 import type { TaskView } from "../types";
 import type { Severity, Tool, Viewport } from "./types";
-import { useAnnotations, marksToAnnotations } from "./useAnnotations";
+import { useAnnotations, marksToAnnotations, pinNumbers } from "./useAnnotations";
 
 // Konva is heavy and browser-only — load the canvas lazily and only on the client.
 const AnnotationCanvas = React.lazy(() =>
@@ -19,9 +19,9 @@ const AnnotationCanvas = React.lazy(() =>
 type Action = "approve" | "request_changes" | "cancel";
 
 const TOOLS: { tool: Tool; label: string; Icon: typeof Square }[] = [
-  { tool: "select", label: "Select", Icon: MousePointer2 },
+  { tool: "select", label: "Select", Icon: Cursor },
   { tool: "box", label: "Box", Icon: Square },
-  { tool: "arrow", label: "Arrow", Icon: MoveUpRight },
+  { tool: "arrow", label: "Arrow", Icon: ArrowUpRight },
   { tool: "pen", label: "Pen", Icon: Pencil },
   { tool: "pin", label: "Pin", Icon: MapPin },
 ];
@@ -43,7 +43,7 @@ export function VisualReview(props: Props) {
   const resolve = useMutation(api.tasks.resolve);
   const ann = useAnnotations();
   const [comment, setComment] = React.useState("");
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [rawSelectedId, setRawSelectedId] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState<Action | null>(null);
 
   const viewports = viewportsOf(task);
@@ -76,6 +76,10 @@ export function VisualReview(props: Props) {
   );
 
   const visibleMarks = ann.marks.filter((m) => m.viewport === viewport);
+  const pinLabels = pinNumbers(ann.marks);
+  // Effective selection: a mark counts as selected only while it's visible in
+  // the current viewport, so a deleted or off-viewport id can't linger.
+  const selectedId = visibleMarks.find((m) => m.id === rawSelectedId)?.id ?? null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -115,10 +119,11 @@ export function VisualReview(props: Props) {
               displayWidth={DISPLAY_WIDTH[viewport]}
               viewport={viewport}
               marks={ann.marks}
+              pinLabels={pinLabels}
               activeTool={ann.activeTool}
               selectedId={selectedId}
-              onSelect={setSelectedId}
-              onAddMark={(m) => setSelectedId(ann.addMark(m))}
+              onSelect={setRawSelectedId}
+              onAddMark={(m) => setRawSelectedId(ann.addMark(m))}
             />
           </React.Suspense>
         </div>
@@ -135,12 +140,15 @@ export function VisualReview(props: Props) {
                 "rounded-xl border p-2",
                 mark.id === selectedId ? "border-accent" : "border-border",
               )}
-              onClick={() => setSelectedId(mark.id)}
             >
               <div className="mb-1.5 flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase text-muted-foreground">
-                  {mark.shape === "pin" ? `Pin ${mark.label}` : mark.shape}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setRawSelectedId(mark.id)}
+                  className="text-xs font-semibold uppercase text-muted-foreground hover:text-foreground"
+                >
+                  {mark.shape === "pin" ? `Pin ${pinLabels[mark.id]}` : mark.shape}
+                </button>
                 <SeverityToggle
                   value={mark.severity}
                   onChange={(s) => ann.setSeverity(mark.id, s)}
@@ -151,7 +159,7 @@ export function VisualReview(props: Props) {
                   className="ml-auto text-muted-foreground hover:text-destructive"
                   onClick={() => ann.removeMark(mark.id)}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash className="h-4 w-4" />
                 </button>
               </div>
               <Textarea
@@ -182,7 +190,7 @@ export function VisualReview(props: Props) {
           Request changes
         </Button>
         <Button variant="ghost" disabled={pending !== null} onClick={() => submit("cancel")}>
-          {pending === "cancel" ? <Spinner /> : <Ban className="h-4 w-4" />}
+          {pending === "cancel" ? <Spinner /> : <Prohibit className="h-4 w-4" />}
           Cancel
         </Button>
       </div>

@@ -1,10 +1,28 @@
 import React from "react";
 import type { Annotation, AnnotationShape, Mark, Severity, Tool, Viewport } from "./types";
 
-// Strip the local editing id — the backend contract carries only geometry,
-// viewport, severity, and comment.
+// Number the pins 1, 2, 3… within each viewport, in the order they were added.
+// Derived (not stored) so deleting a pin renumbers the rest with no gaps or
+// duplicates. Returns a map of mark id → display number.
+export function pinNumbers(marks: Mark[]): Record<string, number> {
+  const perViewport: Record<string, number> = {};
+  const numbers: Record<string, number> = {};
+  for (const mark of marks) {
+    if (mark.shape !== "pin") continue;
+    perViewport[mark.viewport] = (perViewport[mark.viewport] ?? 0) + 1;
+    numbers[mark.id] = perViewport[mark.viewport];
+  }
+  return numbers;
+}
+
+// Strip the local editing id and stamp each pin with its derived label — the
+// backend contract carries geometry, viewport, severity, comment, and (for
+// pins) the number.
 export function marksToAnnotations(marks: Mark[]): Annotation[] {
-  return marks.map(({ id: _id, ...annotation }) => annotation);
+  const numbers = pinNumbers(marks);
+  return marks.map(({ id, ...annotation }) =>
+    annotation.shape === "pin" ? { ...annotation, label: numbers[id] } : annotation,
+  );
 }
 
 export interface NewMark {
@@ -36,11 +54,7 @@ export function useAnnotations(): AnnotationsApi {
 
   const addMark = React.useCallback((input: NewMark): string => {
     const id = `m${++nextId.current}`;
-    setMarks((prev) => {
-      const label =
-        input.shape === "pin" ? prev.filter((m) => m.shape === "pin").length + 1 : undefined;
-      return [...prev, { id, severity: "blocker", comment: "", label, ...input }];
-    });
+    setMarks((prev) => [...prev, { id, severity: "blocker", comment: "", ...input }]);
     return id;
   }, []);
 

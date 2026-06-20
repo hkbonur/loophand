@@ -438,3 +438,83 @@ describe("tasks dependencies (create)", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("tasks dependencies (unblock)", () => {
+  async function create(
+    t: ReturnType<typeof convexTest>,
+    ids: { userId: Id<"users">; tokenId: Id<"apiTokens"> },
+    dependsOn?: string[],
+  ) {
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId: ids.userId,
+      tokenId: ids.tokenId,
+      type: "approval",
+      title: "t",
+      instructions: "t",
+      dependsOn,
+    });
+    return task;
+  }
+
+  async function statusOf(t: ReturnType<typeof convexTest>, id: Id<"tasks">) {
+    const row = await t.run((ctx) => ctx.db.get(id));
+    return row?.status;
+  }
+
+  test("approving the sole dep opens the dependent", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    const dep = await create(t, ids);
+    const child = await create(t, ids, [dep.task_id]);
+    expect(child.status).toBe("blocked");
+
+    await asOwner.mutation(api.tasks.resolve, {
+      taskId: dep.task_id,
+      action: "approve",
+      revision: 0,
+    });
+    expect(await statusOf(t, child.task_id)).toBe("open");
+  });
+
+  test("a dependent on two deps unblocks exactly once both are approved", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    const dep1 = await create(t, ids);
+    const dep2 = await create(t, ids);
+    const child = await create(t, ids, [dep1.task_id, dep2.task_id]);
+    expect(child.status).toBe("blocked");
+
+    await asOwner.mutation(api.tasks.resolve, {
+      taskId: dep1.task_id,
+      action: "approve",
+      revision: 0,
+    });
+    // Still blocked — dep2 outstanding. Re-checking ALL deps is what prevents a
+    // premature open here.
+    expect(await statusOf(t, child.task_id)).toBe("blocked");
+
+    await asOwner.mutation(api.tasks.resolve, {
+      taskId: dep2.task_id,
+      action: "approve",
+      revision: 0,
+    });
+    expect(await statusOf(t, child.task_id)).toBe("open");
+  });
+
+  test("requesting changes on a dep leaves the dependent blocked", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    const dep = await create(t, ids);
+    const child = await create(t, ids, [dep.task_id]);
+
+    await asOwner.mutation(api.tasks.resolve, {
+      taskId: dep.task_id,
+      action: "request_changes",
+      revision: 0,
+    });
+    expect(await statusOf(t, child.task_id)).toBe("blocked");
+  });
+});

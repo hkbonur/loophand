@@ -302,6 +302,26 @@ async function readDeps(ctx: QueryCtx | MutationCtx, taskId: Id<"tasks">): Promi
   return deps;
 }
 
+// A dep just became approved: re-check each blocked dependent against ALL its
+// deps (freshly read) and open the ones now satisfied. Re-reading every dep —
+// rather than trusting a counter — is what makes two deps finishing at once
+// resolve correctly instead of wedging a dependent blocked forever.
+async function unblockDependents(ctx: MutationCtx, taskId: Id<"tasks">): Promise<void> {
+  const edges = await ctx.db
+    .query("taskDeps")
+    .withIndex("by_dependsOn", (q) => q.eq("dependsOnTaskId", taskId))
+    .collect();
+  const now = Date.now();
+  for (const edge of edges) {
+    const dependent = await ctx.db.get(edge.taskId);
+    if (!dependent || dependent.status !== "blocked") continue;
+    const deps = await readDeps(ctx, dependent._id);
+    if (!canUnblock(deps, dependent.notBefore, now)) continue;
+    await ctx.db.patch(dependent._id, { status: "open", updatedAt: now });
+    await maybeNotifyOwner(ctx, dependent.userId, dependent._id, now);
+  }
+}
+
 // ── Agent-facing (trusted userId from token auth, used by MCP tools) ─────────
 
 export const createForAgent = internalMutation({
@@ -711,6 +731,8 @@ export const resolve = mutation({
       revision: task.revision + 1,
       createdAt: now,
     });
+    // An approval may release blocked dependents (re-checked against all deps).
+    if (args.action === "approve") await unblockDependents(ctx, args.taskId);
     const updated = await ctx.db.get(args.taskId);
     if (!updated) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
     return enrichTaskView(ctx, updated);

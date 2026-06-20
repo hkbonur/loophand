@@ -117,37 +117,41 @@ export function ImageStudio(props: Props) {
         </>
       }
       actions={
-        <div className="flex w-full flex-wrap items-center justify-between gap-2">
-          <span className="text-xs tabular-nums text-muted-foreground">
-            {dims ? `${dims.width}×${dims.height}px · ${ops.length} edits` : "Loading…"}
-          </span>
-          <div className="flex items-center gap-2">
-            <select
-              value={outputType}
-              onChange={(e) => setOutputType(e.target.value as OutputType)}
-              aria-label="Export format"
-              className="h-9 rounded-full border border-border bg-muted px-3 text-xs"
-            >
-              {OUTPUT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {extensionFor(t).toUpperCase()}
-                </option>
-              ))}
-            </select>
-            <Button variant="secondary" onClick={download} disabled={!source}>
-              <DownloadSimpleIcon className="h-4 w-4" /> Download
-            </Button>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {dims ? `${dims.width}×${dims.height}px · ${ops.length} edits` : "Loading…"}
+            </span>
+            <div className="flex items-center gap-2">
+              <select
+                value={outputType}
+                onChange={(e) => setOutputType(e.target.value as OutputType)}
+                aria-label="Export format"
+                className="h-9 rounded-full border border-border bg-muted px-3 text-xs"
+              >
+                {OUTPUT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {extensionFor(t).toUpperCase()}
+                  </option>
+                ))}
+              </select>
+              <Button variant="secondary" onClick={download} disabled={!source}>
+                <DownloadSimpleIcon className="h-4 w-4" /> Download
+              </Button>
+            </div>
+          </div>
+          <div className="border-t border-border pt-3">
+            <ResolvePanel task={props.task} onResolved={props.onResolved} />
           </div>
         </div>
       }
-      aside={<ResolvePanel task={props.task} onResolved={props.onResolved} />}
     >
       {source ? (
-        <div className="flex justify-center p-3">
-          <canvas ref={canvasRef} className="max-w-full" />
+        <div className="flex min-h-[240px] items-center justify-center p-6">
+          <canvas ref={canvasRef} className="max-h-[60vh] max-w-full rounded-md shadow-sm" />
         </div>
       ) : (
-        <div className="flex items-center justify-center p-12">
+        <div className="flex min-h-[240px] items-center justify-center">
           <Spinner />
         </div>
       )}

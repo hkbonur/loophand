@@ -17,6 +17,11 @@ interface Props {
 // aside for marks + comments — so every medium gets the same draw-and-comment
 // affordances and the per-medium part is only the toolbar + preview content.
 export function ArtifactStudio(props: Props) {
+  const preview = (
+    <div className="min-w-0 overflow-auto rounded-2xl border border-border bg-muted/40">
+      {props.children}
+    </div>
+  );
   return (
     <div className="flex flex-col gap-4">
       {props.toolbar ? (
@@ -25,14 +30,16 @@ export function ArtifactStudio(props: Props) {
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0 overflow-auto rounded-2xl border border-border bg-card">
-          {props.children}
+      {props.aside ? (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          {preview}
+          <div className="flex flex-col gap-3">{props.aside}</div>
         </div>
-        {props.aside ? <div className="flex flex-col gap-3">{props.aside}</div> : null}
-      </div>
+      ) : (
+        preview
+      )}
 
-      {props.actions ? <div className="flex flex-wrap gap-2">{props.actions}</div> : null}
+      {props.actions ? <div>{props.actions}</div> : null}
     </div>
   );
 }

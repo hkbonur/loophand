@@ -13,7 +13,7 @@ export function Empty(props: Props) {
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border bg-muted px-6 py-12 text-center",
+        "flex min-w-0 flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border bg-muted px-4 py-10 text-center sm:px-6 sm:py-12",
         props.className,
       )}
     >

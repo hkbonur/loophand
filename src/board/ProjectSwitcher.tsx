@@ -45,7 +45,7 @@ export function ProjectSwitcher(props: Props) {
       ))}
 
       {creating ? (
-        <div className="flex items-center gap-1.5">
+        <div className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto">
           <input
             autoFocus
             value={name}
@@ -55,7 +55,7 @@ export function ProjectSwitcher(props: Props) {
               if (event.key === "Escape") setCreating(false);
             }}
             placeholder="Project name"
-            className="h-9 rounded-full border border-border bg-muted px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30"
+            className="h-9 min-w-0 flex-1 rounded-full border border-border bg-muted px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 sm:w-48 sm:flex-none"
           />
           <Button size="sm" onClick={submitNew}>
             Add

@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-20T00:00:00Z",
+  "title": "Design System: loophand",
+  "extensions": {
+    "colorMeta": {
+      "ink": { "role": "primary", "displayName": "Ink", "canonical": "#262626", "tonalRamp": ["#171717", "#262626", "#404040", "#6b6b6b", "#a3a3a3", "#d4d4d4", "#e8e8e8", "#fafafa"] },
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "#ffffff", "tonalRamp": ["#0c0c0c", "#111111", "#161616", "#262626", "#6b6b6b", "#d4d4d4", "#fafafa", "#ffffff"] },
+      "mist": { "role": "neutral", "displayName": "Mist", "canonical": "rgba(0,0,0,0.04)", "tonalRamp": ["#1a1a1a", "#2e2e2e", "#4d4d4d", "#737373", "#a1a1a1", "#c4c4c4", "#ececec", "#f6f6f6"] },
+      "success": { "role": "tertiary", "displayName": "Signal Green", "canonical": "#059669", "tonalRamp": ["#022c22", "#064e3b", "#047857", "#059669", "#10b981", "#34d399", "#6ee7b7", "#d1fae5"] },
+      "warning": { "role": "tertiary", "displayName": "Signal Amber", "canonical": "#b45309", "tonalRamp": ["#451a03", "#7c2d12", "#9a3412", "#b45309", "#d97706", "#f59e0b", "#fbbf24", "#fde68a"] },
+      "destructive": { "role": "tertiary", "displayName": "Signal Red", "canonical": "#ef4444", "tonalRamp": ["#450a0a", "#7f1d1d", "#b91c1c", "#dc2626", "#ef4444", "#f87171", "#fca5a5", "#fee2e2"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page titles like \"Board\". The loudest type on any screen." },
+      "title": { "displayName": "Title", "purpose": "Panel and section headings, empty-state titles." },
+      "body": { "displayName": "Body", "purpose": "Card titles, descriptions, the working text of the app." },
+      "label": { "displayName": "Kicker", "purpose": "Uppercase eyebrow labels, wide tracking, 0.69rem." }
+    },
+    "shadows": [
+      { "name": "rest", "value": "0 1px 2px 0 rgba(0,0,0,0.05)", "purpose": "Every card and panel at rest, over a hairline border." },
+      { "name": "lift", "value": "0 4px 6px -1px rgba(0,0,0,0.07)", "purpose": "Interactive card on hover, paired with a 2px upward translate." },
+      { "name": "float", "value": "0 20px 25px -5px rgba(0,0,0,0.12)", "purpose": "Dialogs and overlays only. Never on inline content." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Ease-out-expo for entrances and lifts; no bounce." },
+      { "name": "duration-state", "value": "180ms", "purpose": "Default transition for color, border, and transform on buttons and links." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single loudest action on a screen. Ink fill, pill shape.",
+      "html": "<button class=\"ds-btn-primary\">Add</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 16px; border: none; border-radius: 9999px; background: var(--primary); color: var(--primary-foreground); font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 0.875rem; line-height: 1; white-space: nowrap; cursor: pointer; transition: background-color 180ms ease, transform 180ms ease; } .ds-btn-primary:hover { background: color-mix(in oklab, var(--primary) 90%, transparent); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 40%, transparent); } .ds-btn-primary:active { transform: translateY(0.5px); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Everything that is not the one primary action. Mist fill, hairline border, ink text.",
+      "html": "<button class=\"ds-btn-secondary\"><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"><circle cx=\"8\" cy=\"8\" r=\"2.5\"/><path d=\"M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2\"/></svg>Agents</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 16px; border: 1px solid var(--border); border-radius: 9999px; background: var(--muted); color: var(--foreground); font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 0.875rem; line-height: 1; white-space: nowrap; cursor: pointer; transition: background-color 180ms ease; } .ds-btn-secondary:hover { background: var(--card); } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 40%, transparent); }"
+    },
+    {
+      "name": "Project Chip",
+      "kind": "chip",
+      "refersTo": "badge-neutral",
+      "description": "Project selector pill. Active = ink border + ink-tinted fill; inactive = mist.",
+      "html": "<div style=\"display:flex;gap:8px\"><button class=\"ds-chip ds-chip-active\">Default</button><button class=\"ds-chip\">Website redesign</button></div>",
+      "css": ".ds-chip { padding: 6px 12px; border-radius: 9999px; border: 1px solid var(--border); background: var(--muted); color: var(--muted-foreground); font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-weight: 500; font-size: 0.875rem; cursor: pointer; transition: color 180ms ease, background-color 180ms ease; } .ds-chip:hover { color: var(--foreground); } .ds-chip-active { border-color: var(--primary); background: color-mix(in oklab, var(--primary) 10%, transparent); color: var(--primary); }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge-neutral",
+      "description": "The only place saturated status color is allowed. Tint fill 15%, border 30%, full-strength text.",
+      "html": "<div style=\"display:flex;gap:6px\"><span class=\"ds-badge ds-badge-success\">Approved</span><span class=\"ds-badge ds-badge-warning\">Changes requested</span><span class=\"ds-badge ds-badge-neutral\">visual_review</span></div>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; border: 1px solid; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-weight: 500; font-size: 0.75rem; } .ds-badge-neutral { background: var(--muted); color: var(--muted-foreground); border-color: var(--border); } .ds-badge-success { background: color-mix(in oklab, var(--success) 15%, transparent); color: var(--success); border-color: color-mix(in oklab, var(--success) 30%, transparent); } .ds-badge-warning { background: color-mix(in oklab, var(--warning) 15%, transparent); color: var(--warning); border-color: color-mix(in oklab, var(--warning) 30%, transparent); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Pill field, mist fill, hairline stroke. Border shifts to ink on focus, soft ring, no glow.",
+      "html": "<input class=\"ds-input\" placeholder=\"Project name\" />",
+      "css": ".ds-input { height: 36px; padding: 0 12px; border-radius: 9999px; border: 1px solid var(--input); background: var(--muted); color: var(--foreground); font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; outline: none; transition: border-color 180ms ease, box-shadow 180ms ease; } .ds-input::placeholder { color: var(--muted-foreground); } .ds-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 30%, transparent); }"
+    },
+    {
+      "name": "Task Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Leaf surface on the board. Flat at rest, lifts on hover. The ink pulse dot marks a task waiting on you.",
+      "html": "<div class=\"ds-card\" role=\"button\" tabindex=\"0\"><div class=\"ds-card-head\"><h4 class=\"ds-card-title\">Review the new pricing screenshot</h4><span class=\"ds-pulse\"></span></div><div class=\"ds-card-tags\"><span class=\"ds-badge ds-badge-neutral\">visual_review</span></div><p class=\"ds-card-meta\">2m ago</p></div>",
+      "css": ".ds-card { border-radius: 16px; border: 1px solid var(--border); background: var(--card); padding: 12px; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); cursor: pointer; transition: transform 200ms cubic-bezier(0.16,1,0.3,1), box-shadow 200ms ease; } .ds-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.07); } .ds-card:focus-visible { outline: none; box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 40%, transparent); } .ds-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; } .ds-card-title { margin: 0; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 0.875rem; line-height: 1.35; color: var(--foreground); } .ds-pulse { margin-top: 4px; flex-shrink: 0; width: 8px; height: 8px; border-radius: 9999px; background: var(--primary); } @media (prefers-reduced-motion: no-preference) { .ds-pulse { animation: ds-pulse 2s ease-in-out infinite; } } @keyframes ds-pulse { 50% { opacity: 0.4; } } .ds-card-tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; } .ds-card-meta { margin: 8px 0 0; font-size: 0.75rem; font-variant-numeric: tabular-nums; color: var(--muted-foreground); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Switchboard",
+    "overview": "loophand is the calm operator's panel between an agent and the person who has to say yes. The agent is blocked; the human is busy; the only job of the surface is to route that one decision and get out of the way. The board is ink on paper, near-silent, and the single card you are acting on is the only thing that earns weight. The aesthetic is the Linear / Raycast lane: monochrome, precise, confident, legible at a glance. Hierarchy comes from weight and size, never decoration. Color is rationed to status alone. Surfaces are flat until you touch them.",
+    "keyCharacteristics": [
+      "Two-tone by default: ink on paper, color only for status.",
+      "One typeface (Manrope) carries the entire hierarchy.",
+      "Flat at rest; elevation is a response to interaction, never decoration.",
+      "Pill geometry for anything actionable; 16-24px radii for content surfaces.",
+      "Light and dark are equal first-class themes, never a reskin."
+    ],
+    "rules": [
+      { "name": "The Ink-and-Paper Rule", "body": "The interface is two-tone. Ink on paper, nothing else, until a state needs to speak. If you are reaching for a colored fill to make something look nicer, the answer is weight, size, or space, not hue.", "section": "colors" },
+      { "name": "The Status-Is-Earned Rule", "body": "Green, amber, and red are reserved for task state and outcomes. They are forbidden as decorative accents, brand color, or emphasis. A color on screen always means 'this is what happened to a task.'", "section": "colors" },
+      { "name": "The One-Voice Rule", "body": "A single typeface carries the entire hierarchy. Contrast is built from weight (400 to 800) and size, never from switching families.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest and separated by a hairline. A shadow only appears as a response to state (hover lift, focus, or an overlay). A resting card with a heavy shadow is a bug.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the board two-tone: ink on paper. Build emphasis from weight (400-800) and size, not color.",
+      "Do reserve green / amber / red for task state and outcomes only, rendered as a tinted badge (15% fill, 30% border, full-strength text).",
+      "Do keep surfaces flat at rest (shadow-sm + hairline) and let shadow appear only on hover-lift or true overlays.",
+      "Do use pill geometry for anything actionable and 16-24px radii for anything that holds content.",
+      "Do carry status with a label or shape in addition to any color, so it survives color blindness and a one-second glance.",
+      "Do honor prefers-reduced-motion on every new transition.",
+      "Do keep both themes in parity: design the token, not the light-mode screen."
+    ],
+    "donts": [
+      "Don't ship generic SaaS slop: no gradient hero-metric cards, no identical icon-card grids, no purple gradients, no AI-template look.",
+      "Don't drift toward heavy enterprise: no Jira / ServiceNow density, cluttered toolbars, or nested panels.",
+      "Don't use crypto / neon: no neon-on-black, no glow effects, no hype aesthetic.",
+      "Don't go cutesy / toy-like: no over-rounding into a toy, no emoji-as-UI, no mascots.",
+      "Don't use a colored border-left / border-right stripe as an accent. Use a full hairline, a tint, or a leading dot.",
+      "Don't put background-clip: text gradients on type. One solid ink color; emphasis via weight or size.",
+      "Don't add a second typeface to create hierarchy. Reach for a heavier Manrope weight first.",
+      "Don't rest a card under a heavy shadow or nest a card inside a card.",
+      "Don't reach for a modal as the first answer. Exhaust inline and progressive surfaces."
+    ]
+  }
+}

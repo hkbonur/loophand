@@ -61,6 +61,7 @@ import type * as lib_rateLimitGuard from "../lib/rateLimitGuard.js";
 import type * as lib_render from "../lib/render.js";
 import type * as lib_screenshots from "../lib/screenshots.js";
 import type * as lib_taskConstants from "../lib/taskConstants.js";
+import type * as lib_taskEmail from "../lib/taskEmail.js";
 import type * as lib_taskInsert from "../lib/taskInsert.js";
 import type * as lib_taskViews from "../lib/taskViews.js";
 import type * as notify from "../notify.js";
@@ -132,6 +133,7 @@ declare const fullApi: ApiFromModules<{
   "lib/render": typeof lib_render;
   "lib/screenshots": typeof lib_screenshots;
   "lib/taskConstants": typeof lib_taskConstants;
+  "lib/taskEmail": typeof lib_taskEmail;
   "lib/taskInsert": typeof lib_taskInsert;
   "lib/taskViews": typeof lib_taskViews;
   notify: typeof notify;

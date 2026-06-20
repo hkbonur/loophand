@@ -166,7 +166,7 @@ function BoardInner() {
       {tasks !== undefined && tasks.length === 0 ? (
         <Empty
           icon={
-            <span className="block h-2.5 w-2.5 rounded-full bg-primary motion-safe:animate-pulse" />
+            <span className="block h-2.5 w-2.5 rounded-full bg-teal-500 dark:bg-teal-400 motion-safe:animate-pulse" />
           }
           title="Waiting for your first task"
           description="Connect an agent with the snippet below. The moment it calls create_task, a card appears here, live."

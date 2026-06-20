@@ -32,7 +32,7 @@ export function TaskCard(props: Props) {
         </h4>
         {waitingOnYou ? (
           <span className="mt-1 flex shrink-0 items-center">
-            <span className="h-2 w-2 rounded-full bg-primary motion-safe:animate-pulse" />
+            <span className="h-2 w-2 rounded-full bg-teal-500 dark:bg-teal-400 motion-safe:animate-pulse" />
             <span className="sr-only">Waiting on you</span>
           </span>
         ) : null}

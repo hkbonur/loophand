@@ -518,3 +518,81 @@ describe("tasks dependencies (unblock)", () => {
     expect(await statusOf(t, child.task_id)).toBe("blocked");
   });
 });
+
+describe("tasks dependencies (failure cascade)", () => {
+  async function create(
+    t: ReturnType<typeof convexTest>,
+    ids: { userId: Id<"users">; tokenId: Id<"apiTokens"> },
+    dependsOn?: string[],
+  ) {
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId: ids.userId,
+      tokenId: ids.tokenId,
+      type: "approval",
+      title: "t",
+      instructions: "t",
+      dependsOn,
+    });
+    return task;
+  }
+
+  async function rowOf(t: ReturnType<typeof convexTest>, id: Id<"tasks">) {
+    return t.run((ctx) => ctx.db.get(id));
+  }
+
+  test("failing a root cascades dependency_failed down A -> B -> C", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const a = await create(t, ids);
+    const b = await create(t, ids, [a.task_id]);
+    const c = await create(t, ids, [b.task_id]);
+
+    await t.mutation(internal.tasks.cancelForAgent, {
+      userId: ids.userId,
+      tokenId: ids.tokenId,
+      taskId: a.task_id,
+    });
+
+    const rb = await rowOf(t, b.task_id);
+    const rc = await rowOf(t, c.task_id);
+    expect(rb?.status).toBe("done");
+    expect(rb?.outcome).toBe("dependency_failed");
+    expect(rc?.status).toBe("done");
+    expect(rc?.outcome).toBe("dependency_failed");
+  });
+
+  test("an expired dep fails its blocked dependents", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const dep = await create(t, ids);
+    const child = await create(t, ids, [dep.task_id]);
+
+    await t.mutation(internal.tasks.expire, { taskId: dep.task_id });
+    const rc = await rowOf(t, child.task_id);
+    expect(rc?.outcome).toBe("dependency_failed");
+  });
+
+  test("a dependent that already opened is not retroactively failed", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    const dep = await create(t, ids);
+    const child = await create(t, ids, [dep.task_id]);
+
+    // Approve the dep so the child opens, then cancel the (now awaiting_agent) dep.
+    await asOwner.mutation(api.tasks.resolve, {
+      taskId: dep.task_id,
+      action: "approve",
+      revision: 0,
+    });
+    expect((await rowOf(t, child.task_id))?.status).toBe("open");
+
+    await t.mutation(internal.tasks.cancelForAgent, {
+      userId: ids.userId,
+      tokenId: ids.tokenId,
+      taskId: dep.task_id,
+    });
+    // The child cleared the gate before the dep was cancelled — it stays open.
+    expect((await rowOf(t, child.task_id))?.status).toBe("open");
+  });
+});

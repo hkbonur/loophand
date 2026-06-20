@@ -322,6 +322,44 @@ async function unblockDependents(ctx: MutationCtx, taskId: Id<"tasks">): Promise
   }
 }
 
+// A task failed terminally: fail every still-blocked dependent
+// (dependency_failed) and cascade down the DAG. Only blocked dependents are
+// touched — one that already cleared the gate (open/resumed/done) has moved on.
+// Iterative + capped so a deep or diamond-shaped DAG can't blow the stack or
+// fan out unbounded; a node reached twice is skipped on the second visit (it's
+// no longer blocked), so diamonds converge.
+const MAX_CASCADE = 1000;
+
+async function failDependents(ctx: MutationCtx, rootTaskId: Id<"tasks">, now: number): Promise<void> {
+  const queue: Id<"tasks">[] = [rootTaskId];
+  let processed = 0;
+  while (queue.length > 0 && processed < MAX_CASCADE) {
+    const current = queue.shift() as Id<"tasks">;
+    const edges = await ctx.db
+      .query("taskDeps")
+      .withIndex("by_dependsOn", (q) => q.eq("dependsOnTaskId", current))
+      .collect();
+    for (const edge of edges) {
+      const dependent = await ctx.db.get(edge.taskId);
+      if (!dependent || dependent.status !== "blocked") continue;
+      await ctx.db.patch(dependent._id, {
+        status: "done",
+        outcome: "dependency_failed",
+        resultVersion: dependent.resultVersion + 1,
+        revision: dependent.revision + 1,
+        updatedAt: now,
+      });
+      await ctx.db.insert("taskActivity", {
+        taskId: dependent._id,
+        type: "dependency_failed",
+        createdAt: now,
+      });
+      queue.push(dependent._id);
+      processed++;
+    }
+  }
+}
+
 // ── Agent-facing (trusted userId from token auth, used by MCP tools) ─────────
 
 export const createForAgent = internalMutation({
@@ -567,6 +605,7 @@ export const cancelForAgent = internalMutation({
       actorTokenId: args.tokenId,
       createdAt: now,
     });
+    await failDependents(ctx, taskId, now);
     const updated = await ctx.db.get(taskId);
     if (!updated) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
     return toAgentView(updated);
@@ -731,8 +770,10 @@ export const resolve = mutation({
       revision: task.revision + 1,
       createdAt: now,
     });
-    // An approval may release blocked dependents (re-checked against all deps).
+    // Propagate to the DAG: an approval may release blocked dependents; a cancel
+    // is a terminal failure that fails the blocked subtree below it.
     if (args.action === "approve") await unblockDependents(ctx, args.taskId);
+    else if (args.action === "cancel") await failDependents(ctx, args.taskId, now);
     const updated = await ctx.db.get(args.taskId);
     if (!updated) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
     return enrichTaskView(ctx, updated);
@@ -798,6 +839,7 @@ export const expire = internalMutation({
       updatedAt: now,
     });
     await ctx.db.insert("taskActivity", { taskId: args.taskId, type: "expired", createdAt: now });
+    await failDependents(ctx, args.taskId, now);
     return null;
   },
 });

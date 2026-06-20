@@ -3,7 +3,6 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Dialog } from "../ui/dialog";
-import { Badge } from "../ui/badge";
 import { Spinner } from "../ui/spinner";
 import { toast } from "../ui/toaster";
 import { TagEditor } from "./TagEditor";
@@ -53,12 +52,13 @@ export function CardDialog(props: Props) {
           {stale ? <StaleBanner message={stale} /> : null}
           {isWide ? (
             // Wide surfaces stack details on top, then the full-width surface.
-            <div className="flex flex-col gap-6 p-6">
+            // Extra top padding on desktop clears the corner close button.
+            <div className="flex flex-col gap-6 px-6 pb-6 pt-6 sm:pt-12">
               <TaskDetails task={task} />
               <TaskPanel task={task} onResolved={props.onClose} />
             </div>
           ) : (
-            <div className="grid gap-6 p-6 sm:grid-cols-[1.2fr_1fr]">
+            <div className="grid gap-6 px-6 pb-6 pt-6 sm:pt-12 sm:grid-cols-[1.2fr_1fr]">
               <TaskDetails task={task} />
               <div className="border-t border-border pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
                 <TaskPanel task={task} onResolved={props.onClose} />
@@ -95,10 +95,10 @@ function TaskDetails(props: { task: TaskView }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Badge tone="info">{task.type}</Badge>
+      <div>
+        <p className="island-kicker mb-1.5">{task.type.replace(/_/g, " ")}</p>
+        <h2 className="text-lg font-bold leading-tight text-foreground">{task.title}</h2>
       </div>
-      <h2 className="text-lg font-bold text-foreground">{task.title}</h2>
       {creator !== undefined || resumer !== undefined ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           {creator !== undefined ? (

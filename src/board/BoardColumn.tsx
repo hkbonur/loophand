@@ -24,7 +24,7 @@ export function BoardColumn(props: Props) {
         <span
           className={cn(
             "rounded-full bg-card px-2 py-0.5 text-xs font-medium tabular-nums",
-            count === 0 ? "text-muted-foreground/70" : "text-muted-foreground",
+            count === 0 ? "text-muted-foreground/70" : "text-foreground",
           )}
         >
           {count}

@@ -52,7 +52,7 @@ export function TagEditor(props: Props) {
         onBlur={commit}
         placeholder="Add a tag…"
         disabled={props.disabled}
-        className="h-7 w-28 rounded-full border border-border bg-card px-3 text-xs text-foreground focus:border-primary focus:outline-none disabled:opacity-50"
+        className="h-7 w-28 rounded-full border border-border bg-muted px-3 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
       />
     </div>
   );

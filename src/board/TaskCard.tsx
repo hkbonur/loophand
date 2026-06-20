@@ -20,7 +20,9 @@ export function TaskCard(props: Props) {
   return (
     <Card interactive onClick={() => props.onOpen(task._id)}>
       <div className="flex items-start justify-between gap-2">
-        <h4 className="text-sm font-semibold leading-snug text-foreground">{task.title}</h4>
+        <h4 className="line-clamp-2 text-sm font-semibold leading-snug text-foreground">
+          {task.title}
+        </h4>
         {waitingOnYou ? (
           <span className="mt-1 flex shrink-0 items-center">
             <span className="h-2 w-2 rounded-full bg-primary motion-safe:animate-pulse" />

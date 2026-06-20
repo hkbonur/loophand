@@ -160,3 +160,34 @@ a {
   font-size: 0.69rem;
   color: var(--muted-foreground);
 }
+
+/* Overlay motion. Gated behind `motion-safe:` at the call site, so reduced-motion
+ * users get the surface with no slide. Curves ease out with no bounce. */
+@keyframes drawer-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes drawer-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

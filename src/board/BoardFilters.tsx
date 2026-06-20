@@ -1,4 +1,4 @@
-import { XIcon } from "@phosphor-icons/react";
+import { CaretDownIcon, XIcon } from "@phosphor-icons/react";
 import type { Id } from "../../convex/_generated/dataModel";
 import { type BoardFilter, EMPTY_FILTER, isFilterActive } from "./filters";
 
@@ -21,10 +21,11 @@ interface Option {
 }
 
 const SELECT_CLASS =
-  "h-9 rounded-full border border-border bg-card px-3 text-xs text-foreground focus:border-primary focus:outline-none";
+  "h-9 appearance-none rounded-full border border-border bg-muted pl-3 pr-8 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30";
 
 // One board-filter dropdown. The empty option ("") clears that dimension; the
-// caller maps the selected string back onto the typed filter.
+// caller maps the selected string back onto the typed filter. Native <select>
+// with a themed caret so the chevron matches the pill chrome on every platform.
 function FilterSelect(props: {
   label: string;
   placeholder: string;
@@ -33,19 +34,25 @@ function FilterSelect(props: {
   onChange: (value: string) => void;
 }) {
   return (
-    <select
-      aria-label={props.label}
-      value={props.value}
-      onChange={(event) => props.onChange(event.target.value)}
-      className={SELECT_CLASS}
-    >
-      <option value="">{props.placeholder}</option>
-      {props.options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
+    <div className="relative">
+      <select
+        aria-label={props.label}
+        value={props.value}
+        onChange={(event) => props.onChange(event.target.value)}
+        className={SELECT_CLASS}
+      >
+        <option value="">{props.placeholder}</option>
+        {props.options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <CaretDownIcon
+        aria-hidden
+        className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+      />
+    </div>
   );
 }
 

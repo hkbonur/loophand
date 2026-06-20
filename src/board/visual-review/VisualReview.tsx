@@ -42,6 +42,7 @@ export function VisualReview(props: Props) {
   const task = props.task;
   const onResolved = props.onResolved;
   const resolve = useMutation(api.tasks.resolve);
+  const reopen = useMutation(api.tasks.reopen);
   const ann = useAnnotations();
   const [comment, setComment] = React.useState("");
   const [rawSelectedId, setRawSelectedId] = React.useState<string | null>(null);
@@ -66,14 +67,31 @@ export function VisualReview(props: Props) {
           revision: task.revision,
           annotations: annotations.length > 0 ? annotations : undefined,
         });
-        toast.success(RESULT_TOAST[action]);
+        const undoable = action !== "cancel";
+        toast.success(
+          RESULT_TOAST[action],
+          undoable
+            ? {
+                action: {
+                  label: "Undo",
+                  onClick: () => {
+                    void reopen({ taskId: task._id })
+                      .then(() => toast.success("Reopened."))
+                      .catch((error) =>
+                        toast.error(error instanceof Error ? error.message : "Could not undo."),
+                      );
+                  },
+                },
+              }
+            : undefined,
+        );
         onResolved();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Could not resolve the task.");
         setPending(null);
       }
     },
-    [resolve, task._id, task.revision, comment, ann.marks, onResolved],
+    [resolve, reopen, task._id, task.revision, comment, ann.marks, onResolved],
   );
 
   const visibleMarks = ann.marks.filter((m) => m.viewport === viewport);

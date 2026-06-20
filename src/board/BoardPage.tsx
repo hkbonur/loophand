@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
-import { GearIcon, ClockIcon, SlidersIcon } from "@phosphor-icons/react";
+import { GearIcon, SlidersIcon } from "@phosphor-icons/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Spinner } from "../ui/spinner";
@@ -157,13 +157,6 @@ function BoardInner() {
           >
             <SlidersIcon className="h-4 w-4" />
             Rules
-          </Link>
-          <Link
-            to="/settings/schedules"
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground no-underline transition hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-          >
-            <ClockIcon className="h-4 w-4" />
-            Schedules
           </Link>
           <Link
             to="/settings/agents"

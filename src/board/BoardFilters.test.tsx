@@ -9,24 +9,23 @@ afterEach(() => cleanup());
 
 const agents = [{ id: "agent-a" as Id<"apiTokens">, name: "claude-code" }];
 const baseProps = {
-  tags: ["docs", "feature"],
   agents,
   types: ["approval", "visual_review"],
 };
 
 describe("BoardFilters", () => {
-  test("selecting a tag emits an updated filter", () => {
-    const onChange = vi.fn();
-    render(<BoardFilters {...baseProps} value={EMPTY_FILTER} onChange={onChange} />);
-    fireEvent.change(screen.getByLabelText(/filter by tag/i), { target: { value: "docs" } });
-    expect(onChange).toHaveBeenCalledWith({ tag: "docs", agentTokenId: null, type: null });
-  });
-
   test("selecting an agent emits the token id", () => {
     const onChange = vi.fn();
     render(<BoardFilters {...baseProps} value={EMPTY_FILTER} onChange={onChange} />);
     fireEvent.change(screen.getByLabelText(/filter by agent/i), { target: { value: "agent-a" } });
-    expect(onChange).toHaveBeenCalledWith({ tag: null, agentTokenId: "agent-a", type: null });
+    expect(onChange).toHaveBeenCalledWith({ agentTokenId: "agent-a", type: null });
+  });
+
+  test("selecting a type emits the type", () => {
+    const onChange = vi.fn();
+    render(<BoardFilters {...baseProps} value={EMPTY_FILTER} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText(/filter by type/i), { target: { value: "approval" } });
+    expect(onChange).toHaveBeenCalledWith({ agentTokenId: null, type: "approval" });
   });
 
   test("shows a clear control only when a filter is active", () => {
@@ -37,7 +36,7 @@ describe("BoardFilters", () => {
     expect(screen.queryByRole("button", { name: /clear/i })).toBeNull();
 
     rerender(
-      <BoardFilters {...baseProps} value={{ ...EMPTY_FILTER, tag: "docs" }} onChange={onChange} />,
+      <BoardFilters {...baseProps} value={{ ...EMPTY_FILTER, type: "approval" }} onChange={onChange} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /clear/i }));
     expect(onChange).toHaveBeenCalledWith(EMPTY_FILTER);

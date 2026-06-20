@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
-import { GearIcon, ClockIcon, SlidersIcon } from "@phosphor-icons/react";
+import { GearIcon } from "@phosphor-icons/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Spinner } from "../ui/spinner";
@@ -79,7 +79,7 @@ function BoardInner() {
 
   const tasks = useQuery(api.tasks.list, activeProjectId ? { projectId: activeProjectId } : "skip");
   const agents = useAgents();
-  const { filter, setFilter, tagOptions, agentOptions, visibleTasks } = useBoardFilters(
+  const { filter, setFilter, agentOptions, visibleTasks } = useBoardFilters(
     tasks,
     agents,
     activeProjectId,
@@ -152,20 +152,6 @@ function BoardInner() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Link
-            to="/settings/preferences"
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground no-underline transition hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-          >
-            <SlidersIcon className="h-4 w-4" />
-            Rules
-          </Link>
-          <Link
-            to="/settings/schedules"
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground no-underline transition hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-          >
-            <ClockIcon className="h-4 w-4" />
-            Schedules
-          </Link>
-          <Link
             to="/settings/agents"
             className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground no-underline transition hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           >
@@ -194,7 +180,6 @@ function BoardInner() {
           {tasks && tasks.length > 0 ? (
             <div className="mb-4">
               <BoardFilters
-                tags={tagOptions}
                 agents={agentOptions}
                 types={[...TASK_TYPES]}
                 value={filter}

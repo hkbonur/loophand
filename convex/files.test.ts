@@ -28,7 +28,6 @@ async function setupOutputOwner(t: ReturnType<typeof convexTest>, email: string)
       type: "doc_review",
       title: "Review docs",
       instructions: "Review the rendered docs",
-      tags: [],
       status: "open",
       resultVersion: 0,
       revision: 0,

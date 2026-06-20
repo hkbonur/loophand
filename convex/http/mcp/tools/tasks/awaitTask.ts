@@ -4,7 +4,7 @@ import { defineTool } from "../../lib/defineTool";
 import { mcpSuccess, mcpEnvelope } from "../../lib/responses";
 import { requireTaskScope } from "../lib/scope";
 import type { AgentTaskDetail } from "../../../../lib/taskViews";
-import { commentShape, preferencesShape } from "./roundTripShapes";
+import { commentShape } from "./roundTripShapes";
 
 const DEFAULT_TIMEOUT_SECONDS = 30;
 const MAX_TIMEOUT_SECONDS = 120;
@@ -42,7 +42,6 @@ export const awaitTaskTool = defineTool({
     // Round-trip context, present only on the resolved (non-pending) envelope.
     comments: z.array(commentShape).optional(),
     guidance: z.string().nullable().optional(),
-    preferences: preferencesShape.optional(),
     poll_after_ms: z.number().optional(),
     resume: z.string().optional(),
   }),
@@ -75,7 +74,6 @@ export const awaitTaskTool = defineTool({
           task_id: task.task_id,
           comments: task.comments,
           guidance: task.guidance,
-          preferences: task.preferences,
         });
       }
       await sleep(POLL_INTERVAL_MS);

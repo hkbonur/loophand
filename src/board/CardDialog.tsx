@@ -5,7 +5,6 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { Dialog } from "../ui/dialog";
 import { Spinner } from "../ui/spinner";
 import { toast } from "../ui/toaster";
-import { TagEditor } from "./TagEditor";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { ResultPanel } from "./ResultPanel";
 import { VisualReview } from "./visual-review/VisualReview";
@@ -86,17 +85,12 @@ function TaskDetails(props: {
 }) {
   const task = props.task;
   const agents = useAgents();
-  const setTags = useMutation(api.tasks.setTags);
   const deps = useQuery(api.deps.forTask, { taskId: task._id });
   const now = Date.now();
   // undefined = no attribution recorded (hide the row); null = the token is gone
   // (show "Unknown agent").
   const creator = task.createdByTokenId ? (agents.get(task.createdByTokenId) ?? null) : undefined;
   const resumer = task.resumedByTokenId ? (agents.get(task.resumedByTokenId) ?? null) : undefined;
-
-  const onTagsChange = (tags: string[]) => {
-    void setTags({ taskId: task._id, tags }).catch(() => toast.error("Could not update tags."));
-  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -126,10 +120,6 @@ function TaskDetails(props: {
           <p className="whitespace-pre-wrap text-sm text-foreground">{task.acceptanceCriteria}</p>
         </div>
       ) : null}
-      <div>
-        <SectionLabel>Tags</SectionLabel>
-        <TagEditor tags={task.tags} onChange={onTagsChange} />
-      </div>
       {deps ? (
         <DepMiniView blockedBy={deps.blockedBy} blocks={deps.blocks} onOpen={props.onOpenTask} />
       ) : null}

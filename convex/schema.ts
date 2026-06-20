@@ -178,7 +178,6 @@ export default defineSchema({
     title: v.string(),
     instructions: v.string(),
     acceptanceCriteria: v.optional(v.string()),
-    tags: v.array(v.string()),
     status: taskStatus,
     // Badge — null is represented by omitting the field.
     outcome: v.optional(taskOutcome),
@@ -255,21 +254,6 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_task", ["taskId"]),
 
-  // Standing rules / preferences (Phase 6). Project-scoped key/value strings with
-  // a user-level fallback: a row with `projectId` omitted applies across every
-  // board; a row with a `projectId` overrides it for that board. Agents read the
-  // resolved map via get_task before asking the human (the round-trip reducer).
-  preferences: defineTable({
-    userId: v.id("users"),
-    projectId: v.optional(v.id("projects")),
-    key: v.string(),
-    value: v.string(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_user", ["userId"])
-    .index("by_scope_key", ["userId", "projectId", "key"]),
-
   // Resolution audit — one row per human action.
   taskAudit: defineTable({
     taskId: v.id("tasks"),
@@ -281,31 +265,6 @@ export default defineSchema({
     revision: v.optional(v.number()),
     createdAt: v.number(),
   }).index("by_task", ["taskId"]),
-
-  // Recurring task templates (Phase 5). `tick` materializes one task per due
-  // slot. Idempotency hinges on advancing `nextRunAt` before creating and on a
-  // per-slot idempotency key; `lastMaterializedSlot` records the last fired slot.
-  schedules: defineTable({
-    userId: v.id("users"),
-    projectId: v.optional(v.id("projects")),
-    // Agent that minted the schedule (via schedule_cron) — used for attribution
-    // and to auto-disable the schedule if the token is revoked. Absent for
-    // human-created schedules.
-    createdByTokenId: v.optional(v.id("apiTokens")),
-    name: v.string(),
-    // The create_task payload to materialize each slot.
-    taskTemplate: v.any(),
-    cron: v.string(),
-    timezone: v.string(),
-    // Skip a slot if the previous materialized task is still unresolved.
-    skipIfPrevOpen: v.boolean(),
-    lastMaterializedSlot: v.optional(v.number()),
-    nextRunAt: v.number(),
-    enabled: v.boolean(),
-    createdAt: v.number(),
-  })
-    .index("by_next_run", ["nextRunAt"])
-    .index("by_user", ["userId"]),
 
   pushSubscriptions: defineTable({
     userId: v.id("users"),

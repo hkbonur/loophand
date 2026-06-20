@@ -1,6 +1,4 @@
 import React from "react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { filterTasks, EMPTY_FILTER, type BoardFilter } from "./filters";
 import type { AgentOption } from "./BoardFilters";
@@ -10,12 +8,11 @@ import type { TaskView } from "./types";
 export interface BoardFiltersState {
   filter: BoardFilter;
   setFilter: (filter: BoardFilter) => void;
-  tagOptions: string[];
   agentOptions: AgentOption[];
   visibleTasks: TaskView[] | undefined;
 }
 
-// Owns the board's filter concern: the tag/agent/type dropdown sources, the
+// Owns the board's filter concern: the agent/type dropdown sources, the
 // selection state (reset per board), and the filtered task list. Keeps
 // BoardInner focused on layout.
 export function useBoardFilters(
@@ -23,10 +20,6 @@ export function useBoardFilters(
   agents: AgentDirectory,
   projectId: Id<"projects"> | null,
 ): BoardFiltersState {
-  const distinctTags = useQuery(
-    api.projects.distinctTags,
-    projectId ? { projectId } : "skip",
-  );
   const [filter, setFilter] = React.useState<BoardFilter>(EMPTY_FILTER);
 
   // A filter set on one board shouldn't leak onto the next.
@@ -49,5 +42,5 @@ export function useBoardFilters(
     [tasks, filter],
   );
 
-  return { filter, setFilter, tagOptions: distinctTags ?? [], agentOptions, visibleTasks };
+  return { filter, setFilter, agentOptions, visibleTasks };
 }

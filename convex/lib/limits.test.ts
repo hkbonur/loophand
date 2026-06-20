@@ -1,11 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { ConvexError } from "convex/values";
 import {
-  MAX_ACTIVE_SCHEDULES,
   MAX_ITEMS_PER_TASK,
   MAX_OUTPUT_BYTES,
   MAX_STORAGE_BYTES_PER_USER,
-  assertActiveScheduleBudget,
   assertItemCount,
   assertOutputSize,
   assertWithinStorageQuota,
@@ -32,16 +30,6 @@ describe("assertOutputSize", () => {
 
   it("rejects a non-positive size", () => {
     expect(() => assertOutputSize(0)).toThrow(ConvexError);
-  });
-});
-
-describe("assertActiveScheduleBudget", () => {
-  it("accepts creating one more below the cap", () => {
-    expect(() => assertActiveScheduleBudget(MAX_ACTIVE_SCHEDULES - 1)).not.toThrow();
-  });
-
-  it("rejects creating one more at the cap", () => {
-    expect(() => assertActiveScheduleBudget(MAX_ACTIVE_SCHEDULES)).toThrow(ConvexError);
   });
 });
 

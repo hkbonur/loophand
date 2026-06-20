@@ -1,15 +1,18 @@
 // Task comment hygiene + the guidance derivation. Comments make "ask the agent
 // back" real: a human leaves direction on a task and the agent reads it via
-// get_task. `guidance` is the convenience shortcut — the freshest human comment —
-// so an agent need not parse the whole thread to pick up the latest instruction.
+// get_task. `guidance` is the convenience shortcut — the freshest comment — so an
+// agent need not parse the whole thread to pick up the latest instruction.
+//
+// Only humans write comments today, so there is no author dimension. Reintroduce
+// one (and filter guidance to human comments) when an agent-comment path lands.
 import { ConvexError } from "convex/values";
 
 export const MAX_COMMENT_LENGTH = 2000;
-
-export type CommentAuthor = "human" | "agent";
+// Cap how many comments a consume returns so a long-lived task's thread can't
+// bloat every agent read. Guidance is still derived from the full thread.
+export const MAX_RETURNED_COMMENTS = 50;
 
 export interface AgentComment {
-  author: CommentAuthor;
   body: string;
   created_at: number;
 }
@@ -28,15 +31,8 @@ export function normalizeCommentBody(raw: string): string {
   return body;
 }
 
-// A comment carrying a tokenId was written by an agent; otherwise it is human.
-export function commentAuthor(row: { userId?: unknown; tokenId?: unknown }): CommentAuthor {
-  return row.tokenId ? "agent" : "human";
-}
-
-// Latest human direction on the task, or null. `comments` is ascending by time.
+// Latest direction on the task, or null. `comments` is ascending by time.
 export function latestGuidance(comments: AgentComment[]): string | null {
-  for (let i = comments.length - 1; i >= 0; i--) {
-    if (comments[i].author === "human") return comments[i].body;
-  }
-  return null;
+  const last = comments[comments.length - 1];
+  return last ? last.body : null;
 }

@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
+import { MAX_RETURNED_COMMENTS } from "./lib/comments";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -48,7 +49,6 @@ describe("tasks.addComment", () => {
       taskId,
       body: "  use the brand palette  ",
     });
-    expect(comment.author).toBe("human");
     expect(comment.body).toBe("use the brand palette");
 
     const stored = await t.run((ctx) =>
@@ -115,9 +115,28 @@ describe("get_task surfacing (consumeForAgent)", () => {
       "use the brand palette",
       "actually, keep it neutral",
     ]);
-    expect(detail.comments.every((c) => c.author === "human")).toBe(true);
     expect(detail.guidance).toBe("actually, keep it neutral");
     expect(detail.preferences).toEqual({ "brand-color": "#fff" });
+  });
+
+  test("bounds the returned thread but derives guidance from the full set", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId, taskId } = await setupTask(t, "owner@example.com");
+
+    const total = MAX_RETURNED_COMMENTS + 5;
+    await t.run(async (ctx) => {
+      for (let i = 0; i < total; i++) {
+        await ctx.db.insert("taskComments", { taskId, userId, body: `c${i}`, createdAt: i });
+      }
+    });
+
+    const detail = await t.mutation(internal.tasks.consumeForAgent, { userId, tokenId, taskId });
+
+    expect(detail.comments).toHaveLength(MAX_RETURNED_COMMENTS);
+    // Newest survives the slice; oldest is dropped.
+    expect(detail.comments.at(-1)?.body).toBe(`c${total - 1}`);
+    expect(detail.comments[0].body).toBe(`c${total - MAX_RETURNED_COMMENTS}`);
+    expect(detail.guidance).toBe(`c${total - 1}`);
   });
 
   test("returns empty comments and null guidance when none exist", async () => {

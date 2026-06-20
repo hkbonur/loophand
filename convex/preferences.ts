@@ -83,16 +83,9 @@ export const set = mutation({
       createdAt: now,
       updatedAt: now,
     });
-    return toPrefView({
-      _id: id,
-      _creationTime: now,
-      userId,
-      projectId: args.projectId,
-      key,
-      value,
-      createdAt: now,
-      updatedAt: now,
-    });
+    const created = await ctx.db.get(id);
+    if (!created) throw new ConvexError({ code: "NOT_FOUND", message: "Preference not found" });
+    return toPrefView(created);
   },
 });
 

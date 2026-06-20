@@ -25,8 +25,8 @@ import { assertDocItemData } from "./lib/render";
 import { normalizeTags } from "./lib/tags";
 import {
   normalizeCommentBody,
-  commentAuthor,
   latestGuidance,
+  MAX_RETURNED_COMMENTS,
   type AgentComment,
 } from "./lib/comments";
 import { resolveForProject } from "./preferences";
@@ -96,7 +96,6 @@ const agentViewValidator = v.object(agentViewFields);
 // the round-trip context an agent reads before acting — the comment thread, the
 // freshest human guidance, and the project's resolved preferences.
 const commentEntryValidator = v.object({
-  author: v.union(v.literal("human"), v.literal("agent")),
   body: v.string(),
   created_at: v.number(),
 });
@@ -439,7 +438,7 @@ async function commentsForTask(
     .collect();
   return rows
     .sort((a, b) => a.createdAt - b.createdAt)
-    .map((r) => ({ author: commentAuthor(r), body: r.body, created_at: r.createdAt }));
+    .map((r) => ({ body: r.body, created_at: r.createdAt }));
 }
 
 // get_task / await_task consume point: flips a resolved task to Agent working and
@@ -450,12 +449,14 @@ export const consumeForAgent = internalMutation({
   handler: async (ctx, args) => {
     const task = await assertOwnedTask(ctx, requireTaskId(ctx, args.taskId), args.userId);
     const consumed = await consumeIfResolved(ctx, task, args.tokenId);
-    const comments = await commentsForTask(ctx, consumed._id);
+    const thread = await commentsForTask(ctx, consumed._id);
     const preferences = await resolveForProject(ctx, args.userId, consumed.projectId);
     return {
       ...toAgentView(consumed),
-      comments,
-      guidance: latestGuidance(comments),
+      // Guidance comes from the full thread; the returned slice is bounded so the
+      // payload stays small on long-lived tasks.
+      comments: thread.slice(-MAX_RETURNED_COMMENTS),
+      guidance: latestGuidance(thread),
       preferences,
     };
   },
@@ -714,7 +715,6 @@ export const setTags = mutation({
 // steer the agent without cancelling and re-creating the task.
 const commentViewValidator = v.object({
   _id: v.id("taskComments"),
-  author: v.union(v.literal("human"), v.literal("agent")),
   body: v.string(),
   createdAt: v.number(),
 });
@@ -739,7 +739,7 @@ export const addComment = mutation({
       actorUserId: userId,
       createdAt: now,
     });
-    return { _id: commentId, author: "human" as const, body, createdAt: now };
+    return { _id: commentId, body, createdAt: now };
   },
 });
 

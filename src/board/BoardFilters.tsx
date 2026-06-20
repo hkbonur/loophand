@@ -15,62 +15,72 @@ interface Props {
   onChange: (filter: BoardFilter) => void;
 }
 
+interface Option {
+  value: string;
+  label: string;
+}
+
 const SELECT_CLASS =
   "h-9 rounded-full border border-border bg-card px-3 text-xs text-foreground focus:border-primary focus:outline-none";
 
-// Board toolbar filter: tag / agent / type. Empty option ("") clears that
-// dimension. Status is the column axis, so it's not offered here.
+// One board-filter dropdown. The empty option ("") clears that dimension; the
+// caller maps the selected string back onto the typed filter.
+function FilterSelect(props: {
+  label: string;
+  placeholder: string;
+  value: string;
+  options: Option[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <select
+      aria-label={props.label}
+      value={props.value}
+      onChange={(event) => props.onChange(event.target.value)}
+      className={SELECT_CLASS}
+    >
+      <option value="">{props.placeholder}</option>
+      {props.options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+const asOption = (value: string): Option => ({ value, label: value });
+
+// Board toolbar filter: tag / agent / type. Status is the column axis, so it's
+// not offered here.
 export function BoardFilters(props: Props) {
   const value = props.value;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <select
-        aria-label="Filter by tag"
+      <FilterSelect
+        label="Filter by tag"
+        placeholder="All tags"
         value={value.tag ?? ""}
-        onChange={(event) => props.onChange({ ...value, tag: event.target.value || null })}
-        className={SELECT_CLASS}
-      >
-        <option value="">All tags</option>
-        {props.tags.map((tag) => (
-          <option key={tag} value={tag}>
-            {tag}
-          </option>
-        ))}
-      </select>
-
-      <select
-        aria-label="Filter by agent"
+        options={props.tags.map(asOption)}
+        onChange={(tag) => props.onChange({ ...value, tag: tag || null })}
+      />
+      <FilterSelect
+        label="Filter by agent"
+        placeholder="All agents"
         value={value.agentTokenId ?? ""}
-        onChange={(event) =>
-          props.onChange({
-            ...value,
-            agentTokenId: (event.target.value || null) as BoardFilter["agentTokenId"],
-          })
+        options={props.agents.map((agent) => ({ value: agent.id, label: agent.name }))}
+        onChange={(id) =>
+          props.onChange({ ...value, agentTokenId: (id || null) as BoardFilter["agentTokenId"] })
         }
-        className={SELECT_CLASS}
-      >
-        <option value="">All agents</option>
-        {props.agents.map((agent) => (
-          <option key={agent.id} value={agent.id}>
-            {agent.name}
-          </option>
-        ))}
-      </select>
-
-      <select
-        aria-label="Filter by type"
+      />
+      <FilterSelect
+        label="Filter by type"
+        placeholder="All types"
         value={value.type ?? ""}
-        onChange={(event) => props.onChange({ ...value, type: event.target.value || null })}
-        className={SELECT_CLASS}
-      >
-        <option value="">All types</option>
-        {props.types.map((type) => (
-          <option key={type} value={type}>
-            {type}
-          </option>
-        ))}
-      </select>
+        options={props.types.map(asOption)}
+        onChange={(type) => props.onChange({ ...value, type: type || null })}
+      />
 
       {isFilterActive(value) ? (
         <button

@@ -1,11 +1,13 @@
 import { cn } from "../lib/cn";
 import { TaskCard } from "./TaskCard";
+import type { AgentDirectory } from "./useAgents";
 import type { Column, TaskView } from "./types";
 
 interface Props {
   column: Column;
   tasks: TaskView[];
   now: number;
+  agents: AgentDirectory;
   loading?: boolean;
   onOpen: (taskId: TaskView["_id"]) => void;
 }
@@ -40,7 +42,13 @@ export function BoardColumn(props: Props) {
           </p>
         ) : (
           props.tasks.map((task) => (
-            <TaskCard key={task._id} task={task} now={props.now} onOpen={props.onOpen} />
+            <TaskCard
+              key={task._id}
+              task={task}
+              now={props.now}
+              agents={props.agents}
+              onOpen={props.onOpen}
+            />
           ))
         )}
       </div>

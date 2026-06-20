@@ -2,18 +2,18 @@ import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { outcomeBadge, relativeAge } from "./format";
 import { AgentChip } from "./AgentChip";
-import { useAgents } from "./useAgents";
+import type { AgentDirectory } from "./useAgents";
 import type { TaskView } from "./types";
 
 interface Props {
   task: TaskView;
   now: number;
+  agents: AgentDirectory;
   onOpen: (taskId: TaskView["_id"]) => void;
 }
 
 export function TaskCard(props: Props) {
   const task = props.task;
-  const agents = useAgents();
   const badge = task.outcome ? outcomeBadge(task.outcome) : null;
   const waitingOnYou = task.status === "open";
 
@@ -42,7 +42,7 @@ export function TaskCard(props: Props) {
           {relativeAge(task.createdAt, props.now)}
         </p>
         {task.createdByTokenId ? (
-          <AgentChip agent={agents.get(task.createdByTokenId) ?? null} now={props.now} />
+          <AgentChip agent={props.agents.get(task.createdByTokenId) ?? null} now={props.now} />
         ) : null}
       </div>
     </Card>

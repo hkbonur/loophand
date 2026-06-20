@@ -33,7 +33,7 @@ import { resolveForProject } from "./preferences";
 import { rateLimiter } from "./rateLimit";
 import { enforceLimit } from "./lib/rateLimitGuard";
 import { initialTaskState } from "./lib/deps";
-import { assertItemCount } from "./lib/limits";
+import { assertItemCount, assertWithinStorageQuota } from "./lib/limits";
 import { maybeNotifyOwner } from "./lib/notifyOwner";
 import { insertTaskRecord } from "./lib/taskInsert";
 import { resolveDeps, unblockDependents, failDependents } from "./deps";
@@ -360,6 +360,13 @@ export const createForAgent = internalMutation({
       ? { screenshotFileId: screenshotFile._id, viewports: args.toolPayload?.viewports }
       : undefined;
 
+    // An attached screenshot is metered storage — reject the create if it would
+    // push the owner over quota (the attach below does the increment).
+    if (screenshotFile) {
+      const owner = await ctx.db.get(args.userId);
+      assertWithinStorageQuota(owner?.storageBytes ?? 0, screenshotFile.size ?? 0);
+    }
+
     const now = Date.now();
     const expiresAt =
       args.ttlSeconds && args.ttlSeconds > 0 ? now + args.ttlSeconds * 1000 : undefined;
@@ -411,7 +418,7 @@ export const createForAgent = internalMutation({
       }
     }
 
-    if (screenshotFile) await attachUploadToTask(ctx, screenshotFile, taskId);
+    if (screenshotFile) await attachUploadToTask(ctx, screenshotFile, taskId, args.userId);
 
     if (expiresAt) await ctx.scheduler.runAt(expiresAt, internal.tasks.expire, { taskId });
     // A future notBefore needs a timer to release the task even if its deps are

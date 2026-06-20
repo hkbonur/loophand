@@ -4,8 +4,9 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
-import { MAX_ITEMS_PER_TASK } from "./lib/limits";
+import { MAX_ITEMS_PER_TASK, MAX_STORAGE_BYTES_PER_USER } from "./lib/limits";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -66,6 +67,58 @@ describe("createForAgent item cap", () => {
         title: "Batch",
         instructions: "Review",
         items: items(MAX_ITEMS_PER_TASK + 1),
+      }),
+    ).rejects.toThrow();
+  });
+});
+
+describe("screenshot input metering", () => {
+  const registerScreenshot = (
+    t: ReturnType<typeof convexTest>,
+    userId: Id<"users">,
+    r2Key: string,
+    size: number,
+  ) =>
+    t.mutation(internal.files.registerUpload, {
+      userId,
+      r2Key,
+      contentType: "image/png",
+      size,
+    });
+
+  test("attaching a screenshot increments the owner's storageBytes", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId, projectId } = await setupOwner(t, "owner@example.com");
+    const fileId = await registerScreenshot(t, userId, "screenshotkey0001", 4096);
+
+    await t.mutation(internal.tasks.createForAgent, {
+      userId,
+      tokenId,
+      project: projectId,
+      type: "visual_review",
+      title: "Look",
+      instructions: "Review",
+      toolPayload: { screenshotFileId: fileId },
+    });
+
+    expect(await t.run((ctx) => ctx.db.get(userId).then((u) => u?.storageBytes))).toBe(4096);
+  });
+
+  test("rejects a visual_review create that would exceed the quota", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId, projectId } = await setupOwner(t, "owner@example.com");
+    const fileId = await registerScreenshot(t, userId, "screenshotkey0002", 4096);
+    await t.run((ctx) => ctx.db.patch(userId, { storageBytes: MAX_STORAGE_BYTES_PER_USER }));
+
+    await expect(
+      t.mutation(internal.tasks.createForAgent, {
+        userId,
+        tokenId,
+        project: projectId,
+        type: "visual_review",
+        title: "Look",
+        instructions: "Review",
+        toolPayload: { screenshotFileId: fileId },
       }),
     ).rejects.toThrow();
   });

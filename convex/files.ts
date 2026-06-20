@@ -80,11 +80,14 @@ export async function assertUploadOwnedBy(
 }
 
 // Bind an uploaded blob to a task and consume its uploader claim. After this a
-// re-reference of the same file fails ownership — one upload, one task.
+// re-reference of the same file fails ownership — one upload, one task. The
+// blob now counts toward the owner's storage quota (an attached input is metered
+// the same as a recorded output; the caller passes the owning userId).
 export async function attachUploadToTask(
   ctx: MutationCtx,
   file: Doc<"managedFiles">,
   taskId: Id<"tasks">,
+  userId: Id<"users">,
 ): Promise<void> {
   await ctx.db.insert("managedFileReferences", {
     fileId: file._id,
@@ -97,6 +100,8 @@ export async function attachUploadToTask(
     .withIndex("by_r2Key", (q) => q.eq("r2Key", file.r2Key))
     .first();
   if (claim) await ctx.db.delete(claim._id);
+  const user = await ctx.db.get(userId);
+  await ctx.db.patch(userId, { storageBytes: (user?.storageBytes ?? 0) + (file.size ?? 0) });
 }
 
 // ── Human-produced outputs (browser → R2, session-authenticated) ─────────────

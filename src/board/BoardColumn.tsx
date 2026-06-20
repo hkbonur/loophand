@@ -10,6 +10,8 @@ interface Props {
   agents: AgentDirectory;
   loading?: boolean;
   onOpen: (taskId: TaskView["_id"]) => void;
+  // The keyboard-focused card in this board, if any (null when elsewhere).
+  focusedTaskId?: TaskView["_id"] | null;
 }
 
 export function BoardColumn(props: Props) {
@@ -48,6 +50,7 @@ export function BoardColumn(props: Props) {
               now={props.now}
               agents={props.agents}
               onOpen={props.onOpen}
+              focused={task._id === props.focusedTaskId}
             />
           ))
         )}

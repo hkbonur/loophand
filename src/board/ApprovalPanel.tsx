@@ -1,6 +1,6 @@
 import React from "react";
 import { useMutation } from "convex/react";
-import { CheckIcon, XIcon, ProhibitIcon } from "@phosphor-icons/react";
+import { CheckIcon, PencilSimpleIcon, ProhibitIcon } from "@phosphor-icons/react";
 import { api } from "../../convex/_generated/api";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
@@ -25,6 +25,10 @@ export function ApprovalPanel(props: Props) {
 
   const submit = React.useCallback(
     async (action: Action) => {
+      if (action === "request_changes" && !comment.trim()) {
+        toast.error("Add a note so the agent knows what to change.");
+        return;
+      }
       setPending(action);
       try {
         await resolve({
@@ -60,7 +64,7 @@ export function ApprovalPanel(props: Props) {
       <div className="flex flex-wrap gap-2">
         <Button disabled={pending !== null} onClick={() => submit("approve")}>
           {pending === "approve" ? (
-            <Spinner className="text-white" />
+            <Spinner className="text-primary-foreground" />
           ) : (
             <CheckIcon className="h-4 w-4" />
           )}
@@ -71,14 +75,20 @@ export function ApprovalPanel(props: Props) {
           disabled={pending !== null}
           onClick={() => submit("request_changes")}
         >
-          {pending === "request_changes" ? <Spinner /> : <XIcon className="h-4 w-4" />}
+          {pending === "request_changes" ? <Spinner /> : <PencilSimpleIcon className="h-4 w-4" />}
           Request changes
         </Button>
-        <Button variant="ghost" disabled={pending !== null} onClick={() => submit("cancel")}>
-          {pending === "cancel" ? <Spinner /> : <ProhibitIcon className="h-4 w-4" />}
-          Cancel
-        </Button>
       </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="self-start"
+        disabled={pending !== null}
+        onClick={() => submit("cancel")}
+      >
+        {pending === "cancel" ? <Spinner /> : <ProhibitIcon className="h-4 w-4" />}
+        Cancel task
+      </Button>
     </div>
   );
 }

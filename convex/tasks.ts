@@ -22,6 +22,7 @@ import {
 } from "./schema";
 import { isTaskType, TASK_TYPES, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
 import { assertDocItemData } from "./lib/render";
+import { normalizeTags } from "./lib/tags";
 
 const statusValidator = v.union(...TASK_STATUSES.map((s) => v.literal(s)));
 const outcomeValidator = v.union(...TASK_OUTCOMES.map((o) => v.literal(o)));
@@ -338,7 +339,7 @@ export const createForAgent = internalMutation({
       title: args.title,
       instructions: args.instructions,
       acceptanceCriteria: args.acceptanceCriteria,
-      tags: args.tags ?? [],
+      tags: normalizeTags(args.tags),
       status: "open",
       toolPayload,
       itemCount: items ? items.length : undefined,
@@ -615,6 +616,21 @@ export const resolve = mutation({
       revision: task.revision + 1,
       createdAt: now,
     });
+    const updated = await ctx.db.get(args.taskId);
+    if (!updated) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
+    return enrichTaskView(ctx, updated);
+  },
+});
+
+// Human-set tags from the board. Normalized on write (trim/lowercase/dedupe/cap)
+// so agent- and human-supplied tags share one hygiene path.
+export const setTags = mutation({
+  args: { taskId: v.id("tasks"), tags: v.array(v.string()) },
+  returns: taskViewValidator,
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    await assertOwnedTask(ctx, args.taskId, userId);
+    await ctx.db.patch(args.taskId, { tags: normalizeTags(args.tags), updatedAt: Date.now() });
     const updated = await ctx.db.get(args.taskId);
     if (!updated) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
     return enrichTaskView(ctx, updated);

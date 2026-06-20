@@ -169,6 +169,23 @@ describe("tasks lifecycle", () => {
     expect(await asStranger.query(api.tasks.get, { taskId: "not-a-real-id" })).toBeNull();
   });
 
+  test("createForAgent normalizes tags on write (trim, lowercase, dedupe)", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId } = await setupOwner(t, "owner@example.com");
+
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId,
+      tokenId,
+      type: "approval",
+      title: "A",
+      instructions: "A",
+      tags: ["  Docs  ", "docs", "FEATURE", ""],
+    });
+
+    const row = await t.run((ctx) => ctx.db.get(task.task_id));
+    expect(row?.tags).toEqual(["docs", "feature"]);
+  });
+
   test("expire is a no-op once the task has left the queue", async () => {
     const t = convexTest(schema, modules);
     const { userId, tokenId } = await setupOwner(t, "owner@example.com");
@@ -191,5 +208,50 @@ describe("tasks lifecycle", () => {
     const row = await t.run((ctx) => ctx.db.get(task.task_id));
     expect(row?.outcome).toBe("approved");
     expect(row?.status).toBe("awaiting_agent");
+  });
+});
+
+describe("tasks.setTags", () => {
+  test("normalizes and persists tags, returning the updated view", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId } = await setupOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId,
+      tokenId,
+      type: "approval",
+      title: "A",
+      instructions: "A",
+      tags: ["docs"],
+    });
+
+    const updated = await asOwner.mutation(api.tasks.setTags, {
+      taskId: task.task_id,
+      tags: ["  Feature  ", "feature", "BUG"],
+    });
+    expect(updated.tags).toEqual(["feature", "bug"]);
+
+    const row = await t.run((ctx) => ctx.db.get(task.task_id));
+    expect(row?.tags).toEqual(["feature", "bug"]);
+  });
+
+  test("rejects setting tags on a task you don't own", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await setupOwner(t, "owner@example.com");
+    await setupOwner(t, "stranger@example.com");
+    const asStranger = t.withIdentity({ email: "stranger@example.com" });
+
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId: owner.userId,
+      tokenId: owner.tokenId,
+      type: "approval",
+      title: "A",
+      instructions: "A",
+    });
+
+    await expect(
+      asStranger.mutation(api.tasks.setTags, { taskId: task.task_id, tags: ["x"] }),
+    ).rejects.toThrow();
   });
 });

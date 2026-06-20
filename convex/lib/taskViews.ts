@@ -18,4 +18,7 @@ export interface AgentTaskView {
   result: unknown;
   result_version: number;
   revision: number;
+  // Present only on multi-item tasks (ADR-0002); null otherwise.
+  item_count: number | null;
+  items_done: number | null;
 }

@@ -36,6 +36,22 @@ const schema = z.object({
     })
     .optional()
     .describe("Required for a visual_review task: the screenshot to annotate (upload it first)."),
+  items: z
+    .array(
+      z.object({
+        title: z.string().optional().describe("Short label for this item on the review rail."),
+        data: z
+          .record(z.string(), z.any())
+          .optional()
+          .describe(
+            "Per-item payload. For doc_review pass { render: { kind: 'react_pdf', tree } } — a serializable node tree (Document > Page > View|Text|Image|Link).",
+          ),
+      }),
+    )
+    .optional()
+    .describe(
+      "Multi-item review: one rail item per entry, all on one card. Required for doc_review (one render spec per document). Mutually exclusive with tool_payload.",
+    ),
   idempotency_key: z
     .string()
     .optional()
@@ -58,6 +74,7 @@ export const createTaskTool = defineTool({
     project_id: z.string(),
     status: z.string(),
     reused: z.boolean(),
+    item_count: z.number().nullable(),
   }),
   execute: async (mcpCtx, input) => {
     requireTaskScope(mcpCtx, "write");
@@ -78,6 +95,7 @@ export const createTaskTool = defineTool({
               viewports: input.tool_payload.viewports,
             }
           : undefined,
+        items: input.items,
         idempotencyKey: input.idempotency_key,
         ttlSeconds: input.ttl_seconds,
       },
@@ -88,6 +106,7 @@ export const createTaskTool = defineTool({
       project_id: task.project_id,
       status: task.status,
       reused: created.reused,
+      item_count: task.item_count,
     });
   },
 });

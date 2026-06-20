@@ -35,6 +35,7 @@ import type * as http_mcp_tools_tasks_getTask from "../http/mcp/tools/tasks/getT
 import type * as http_mcp_tools_tasks_index from "../http/mcp/tools/tasks/index.js";
 import type * as http_mcp_tools_tasks_listProjects from "../http/mcp/tools/tasks/listProjects.js";
 import type * as http_mcp_tools_tasks_listTasks from "../http/mcp/tools/tasks/listTasks.js";
+import type * as http_mcp_tools_tasks_resumeItems from "../http/mcp/tools/tasks/resumeItems.js";
 import type * as http_mcp_tools_tasks_uploadScreenshot from "../http/mcp/tools/tasks/uploadScreenshot.js";
 import type * as http_mcp_types from "../http/mcp/types.js";
 import type * as http_storage from "../http/storage.js";
@@ -97,6 +98,7 @@ declare const fullApi: ApiFromModules<{
   "http/mcp/tools/tasks/index": typeof http_mcp_tools_tasks_index;
   "http/mcp/tools/tasks/listProjects": typeof http_mcp_tools_tasks_listProjects;
   "http/mcp/tools/tasks/listTasks": typeof http_mcp_tools_tasks_listTasks;
+  "http/mcp/tools/tasks/resumeItems": typeof http_mcp_tools_tasks_resumeItems;
   "http/mcp/tools/tasks/uploadScreenshot": typeof http_mcp_tools_tasks_uploadScreenshot;
   "http/mcp/types": typeof http_mcp_types;
   "http/storage": typeof http_storage;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { keyToNavCommand, moveFocus, type Focus } from "./boardKeymap";
+import { keyToNavCommand, keyToActionCommand, canQuickApprove, moveFocus, type Focus } from "./boardKeymap";
 
 describe("keyToNavCommand", () => {
   it("maps vim keys and arrows", () => {
@@ -57,5 +57,29 @@ describe("moveFocus", () => {
     const f: Focus = { col: 2, row: 1 };
     expect(moveFocus(cols, f, "open")).toBe(f);
     expect(moveFocus(cols, f, null)).toBe(f);
+  });
+});
+
+describe("keyToActionCommand", () => {
+  it("maps a/r/c to actions", () => {
+    expect(keyToActionCommand("a")).toBe("approve");
+    expect(keyToActionCommand("r")).toBe("request_changes");
+    expect(keyToActionCommand("c")).toBe("comment");
+  });
+  it("ignores other keys", () => {
+    expect(keyToActionCommand("x")).toBeNull();
+    expect(keyToActionCommand("j")).toBeNull();
+  });
+});
+
+describe("canQuickApprove", () => {
+  it("allows an open single-item task", () => {
+    expect(canQuickApprove({ status: "open", itemCount: null })).toBe(true);
+  });
+  it("rejects a multi-item task", () => {
+    expect(canQuickApprove({ status: "open", itemCount: 3 })).toBe(false);
+  });
+  it("rejects a non-open task", () => {
+    expect(canQuickApprove({ status: "awaiting_agent", itemCount: null })).toBe(false);
   });
 });

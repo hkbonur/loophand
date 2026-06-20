@@ -3,6 +3,28 @@
 // and the focus arithmetic so both are unit-testable without a DOM.
 
 export type NavCommand = "up" | "down" | "left" | "right" | "open" | null;
+export type ActionCommand = "approve" | "request_changes" | "comment" | null;
+
+// Resolution shortcuts on the focused card: a = approve, r = request changes,
+// c = comment. r/c need the dialog (feedback); a can resolve in place.
+export function keyToActionCommand(key: string): ActionCommand {
+  switch (key) {
+    case "a":
+      return "approve";
+    case "r":
+      return "request_changes";
+    case "c":
+      return "comment";
+    default:
+      return null;
+  }
+}
+
+// A card can be approved straight from the keyboard only when it's open and not
+// multi-item (those resolve per-item through the rail, not tasks.resolve).
+export function canQuickApprove(task: { status: string; itemCount: number | null }): boolean {
+  return task.status === "open" && task.itemCount === null;
+}
 
 export interface Focus {
   col: number;

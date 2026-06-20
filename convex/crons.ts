@@ -48,5 +48,6 @@ crons.daily(
   { hourUTC: 4, minuteUTC: 15 },
   internal.reconcile.itemCounts,
 );
+crons.interval("materialize-schedules", { minutes: 1 }, internal.schedules.tick, {});
 
 export default crons;

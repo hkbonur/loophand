@@ -7,6 +7,7 @@ import { ensureDefaultProject } from "./lib/projectHelpers";
 import { nextSlot, isValidCron, isValidTimezone } from "./lib/cron";
 import { normalizeTags } from "./lib/tags";
 import { maybeNotifyOwner } from "./lib/notifyOwner";
+import { insertTaskRecord } from "./lib/taskInsert";
 
 // How many due schedules one tick materializes (full quotas in Phase 6).
 const TICK_BATCH = 100;
@@ -220,7 +221,7 @@ async function materializeScheduledTask(
   };
   const projectId = schedule.projectId ?? (await ensureDefaultProject(ctx, schedule.userId));
   const now = Date.now();
-  const taskId = await ctx.db.insert("tasks", {
+  const taskId = await insertTaskRecord(ctx, {
     userId: schedule.userId,
     projectId,
     createdByTokenId: schedule.createdByTokenId,
@@ -235,12 +236,6 @@ async function materializeScheduledTask(
     idempotencyKey,
     createdAt: now,
     updatedAt: now,
-  });
-  await ctx.db.insert("taskActivity", {
-    taskId,
-    type: "created",
-    actorTokenId: schedule.createdByTokenId,
-    createdAt: now,
   });
   await maybeNotifyOwner(ctx, schedule.userId, taskId, now);
 }

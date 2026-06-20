@@ -27,6 +27,7 @@ import { rateLimiter } from "./rateLimit";
 import { enforceLimit } from "./lib/rateLimitGuard";
 import { initialTaskState } from "./lib/deps";
 import { maybeNotifyOwner } from "./lib/notifyOwner";
+import { insertTaskRecord } from "./lib/taskInsert";
 import { resolveDeps, unblockDependents, failDependents } from "./deps";
 
 const statusValidator = v.union(...TASK_STATUSES.map((s) => v.literal(s)));
@@ -345,7 +346,7 @@ export const createForAgent = internalMutation({
     const deps = await resolveDeps(ctx, args.userId, projectId, args.dependsOn);
     const initial = initialTaskState(deps, args.notBefore, now);
 
-    const taskId = await ctx.db.insert("tasks", {
+    const taskId = await insertTaskRecord(ctx, {
       userId: args.userId,
       projectId,
       createdByTokenId: args.tokenId,
@@ -388,12 +389,6 @@ export const createForAgent = internalMutation({
 
     if (screenshotFile) await attachUploadToTask(ctx, screenshotFile, taskId);
 
-    await ctx.db.insert("taskActivity", {
-      taskId,
-      type: "created",
-      actorTokenId: args.tokenId,
-      createdAt: now,
-    });
     if (expiresAt) await ctx.scheduler.runAt(expiresAt, internal.tasks.expire, { taskId });
     // A future notBefore needs a timer to release the task even if its deps are
     // already satisfied; dep-driven release goes through unblockDependents.

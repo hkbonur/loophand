@@ -46,6 +46,16 @@ export function MultiItemReview(props: Props) {
     );
   }
 
+  // The task says it has items but none have landed yet — gate the rail on the
+  // items actually being attached, not just on the task existing.
+  if (items.length === 0) {
+    return (
+      <p className="p-6 text-sm text-muted-foreground">
+        The agent is still attaching the items for this review…
+      </p>
+    );
+  }
+
   const stageVerdict = (order: number, status: Verdict) =>
     setStaged((prev) => ({ ...prev, [order]: { status, comment: prev[order]?.comment ?? "" } }));
   const stageComment = (order: number, comment: string) =>

@@ -1,3 +1,4 @@
+import React from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -9,6 +10,7 @@ import { ResultPanel } from "./ResultPanel";
 import { VisualReview } from "./visual-review/VisualReview";
 import { MultiItemReview } from "./item-rail/MultiItemReview";
 import { SectionLabel } from "./SectionLabel";
+import { staleNotice } from "./staleNotice";
 import type { TaskView } from "./types";
 
 interface Props {
@@ -21,6 +23,13 @@ export function CardDialog(props: Props) {
   // Surfaces that need the full dialog width: the annotation canvas and the
   // multi-item rail.
   const isWide = !!task && (task.type === "visual_review" || task.itemCount !== null);
+
+  // Remember the status the card had when it was opened, so we can tell a task
+  // that went stale under the dialog (expired / agent-cancelled) from one the
+  // human is simply reopening after the fact.
+  const firstStatus = React.useRef<TaskView["status"] | null>(null);
+  if (task && firstStatus.current === null) firstStatus.current = task.status;
+  const stale = task && firstStatus.current ? staleNotice(firstStatus.current, task) : null;
 
   return (
     <Dialog
@@ -35,21 +44,34 @@ export function CardDialog(props: Props) {
         </div>
       ) : task === null ? (
         <div className="p-8 text-sm text-muted-foreground">This task is no longer available.</div>
-      ) : isWide ? (
-        // Wide surfaces stack details on top, then the full-width review surface.
-        <div className="flex flex-col gap-6 p-6">
-          <TaskDetails task={task} />
-          <TaskPanel task={task} onResolved={props.onClose} />
-        </div>
       ) : (
-        <div className="grid gap-6 p-6 sm:grid-cols-[1.2fr_1fr]">
-          <TaskDetails task={task} />
-          <div className="border-t border-border pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
-            <TaskPanel task={task} onResolved={props.onClose} />
-          </div>
+        <div className="flex flex-col">
+          {stale ? <StaleBanner message={stale} /> : null}
+          {isWide ? (
+            // Wide surfaces stack details on top, then the full-width surface.
+            <div className="flex flex-col gap-6 p-6">
+              <TaskDetails task={task} />
+              <TaskPanel task={task} onResolved={props.onClose} />
+            </div>
+          ) : (
+            <div className="grid gap-6 p-6 sm:grid-cols-[1.2fr_1fr]">
+              <TaskDetails task={task} />
+              <div className="border-t border-border pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
+                <TaskPanel task={task} onResolved={props.onClose} />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Dialog>
+  );
+}
+
+function StaleBanner(props: { message: string }) {
+  return (
+    <div className="border-b border-warning/30 bg-warning/10 px-6 py-3 text-sm text-warning">
+      {props.message}
+    </div>
   );
 }
 

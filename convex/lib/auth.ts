@@ -108,9 +108,17 @@ export async function getProvider(
   ctx: GenericCtx<DataModel>,
   _userId: string,
 ): Promise<string | null> {
-  const { auth, headers } = await authComponent.getAuth(createAuth, ctx);
-  const accounts = await auth.api.listUserAccounts({ headers });
-  return accounts?.[0]?.providerId ?? null;
+  // listUserAccounts goes through an internal better-fetch round-trip that can
+  // throw a BetterFetchError ("HTTPError") when the session token is stale —
+  // e.g. an idle tab past the 15-min JWT horizon. Swallow it: provider is a
+  // cosmetic cache, never worth turning a transient auth blip into a Convex 500.
+  try {
+    const { auth, headers } = await authComponent.getAuth(createAuth, ctx);
+    const accounts = await auth.api.listUserAccounts({ headers });
+    return accounts?.[0]?.providerId ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getCurrentUserId(ctx: QueryCtx | MutationCtx): Promise<Id<"users"> | null> {

@@ -14,6 +14,7 @@ import { SectionLabel } from "./SectionLabel";
 import { staleNotice } from "./staleNotice";
 import { AgentChip } from "./AgentChip";
 import { DepMiniView } from "./DepMiniView";
+import { CommentsSection } from "./comments/CommentsSection";
 import { useAgents } from "./useAgents";
 import type { TaskView } from "./types";
 
@@ -130,7 +131,37 @@ function TaskDetails(props: { task: TaskView; onOpenTask?: (taskId: Id<"tasks">)
       {deps ? (
         <DepMiniView blockedBy={deps.blockedBy} blocks={deps.blocks} onOpen={props.onOpenTask} />
       ) : null}
+      <TaskComments taskId={task._id} />
     </div>
+  );
+}
+
+// Container: owns the comments query + addComment mutation, hands the rest to the
+// presentational CommentsSection.
+function TaskComments(props: { taskId: Id<"tasks"> }) {
+  const comments = useQuery(api.tasks.comments, { taskId: props.taskId });
+  const addComment = useMutation(api.tasks.addComment);
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const onAdd = async (body: string) => {
+    setSubmitting(true);
+    try {
+      await addComment({ taskId: props.taskId, body });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not add the comment.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (comments === undefined) return null;
+  return (
+    <CommentsSection
+      comments={comments}
+      onAdd={onAdd}
+      submitting={submitting}
+      now={Date.now()}
+    />
   );
 }
 

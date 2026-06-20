@@ -8,9 +8,13 @@ import { Spinner } from "../ui/spinner";
 import { Empty } from "../ui/empty";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { BoardColumn } from "./BoardColumn";
+import { BoardFilters, type AgentOption } from "./BoardFilters";
 import { CardDialog } from "./CardDialog";
 import { ConnectSnippet } from "./ConnectSnippet";
 import { COLUMNS, type TaskView } from "./types";
+import { filterTasks, EMPTY_FILTER, type BoardFilter } from "./filters";
+import { useAgents } from "./useAgents";
+import { TASK_TYPES } from "../../convex/lib/taskConstants";
 import { toast } from "../ui/toaster";
 import { PushPrompt } from "../pwa/PushPrompt";
 
@@ -72,6 +76,32 @@ function BoardInner() {
   }, []);
 
   const tasks = useQuery(api.tasks.list, activeProjectId ? { projectId: activeProjectId } : "skip");
+  const distinctTags = useQuery(
+    api.projects.distinctTags,
+    activeProjectId ? { projectId: activeProjectId } : "skip",
+  );
+  const agents = useAgents();
+  const [filter, setFilter] = React.useState<BoardFilter>(EMPTY_FILTER);
+
+  // A filter set on one board shouldn't leak onto the next.
+  React.useEffect(() => setFilter(EMPTY_FILTER), [activeProjectId]);
+
+  // Offer only agents that actually raised a card on this board, named via the
+  // agent directory (a since-deleted token still shows, as "Unknown agent").
+  const agentOptions = React.useMemo<AgentOption[]>(() => {
+    const ids = new Map<Id<"apiTokens">, string>();
+    for (const task of tasks ?? []) {
+      if (task.createdByTokenId && !ids.has(task.createdByTokenId)) {
+        ids.set(task.createdByTokenId, agents.get(task.createdByTokenId)?.name ?? "Unknown agent");
+      }
+    }
+    return [...ids].map(([id, name]) => ({ id, name }));
+  }, [tasks, agents]);
+
+  const visibleTasks = React.useMemo(
+    () => (tasks ? filterTasks(tasks, filter) : tasks),
+    [tasks, filter],
+  );
 
   const onCreateProject = React.useCallback(
     async (name: string) => {
@@ -124,18 +154,31 @@ function BoardInner() {
           </div>
         </Empty>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {COLUMNS.map((column) => (
-            <BoardColumn
-              key={column.status}
-              column={column}
-              tasks={(tasks ?? []).filter((task: TaskView) => task.status === column.status)}
-              now={now}
-              loading={tasks === undefined}
-              onOpen={setSelectedTaskId}
-            />
-          ))}
-        </div>
+        <>
+          {tasks && tasks.length > 0 ? (
+            <div className="mb-4">
+              <BoardFilters
+                tags={distinctTags ?? []}
+                agents={agentOptions}
+                types={[...TASK_TYPES]}
+                value={filter}
+                onChange={setFilter}
+              />
+            </div>
+          ) : null}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {COLUMNS.map((column) => (
+              <BoardColumn
+                key={column.status}
+                column={column}
+                tasks={(visibleTasks ?? []).filter((task: TaskView) => task.status === column.status)}
+                now={now}
+                loading={tasks === undefined}
+                onOpen={setSelectedTaskId}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {selectedTaskId ? (

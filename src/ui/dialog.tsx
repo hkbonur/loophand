@@ -10,8 +10,9 @@ interface Props {
   title?: string;
   className?: string;
   // "full" near-fills the viewport (a tall working canvas); content scrolls
-  // inside the panel rather than growing the overlay.
-  size?: "default" | "full";
+  // inside the panel rather than growing the overlay. "screen" edge-to-edge fills
+  // the whole viewport (the canvas-first studio takeover).
+  size?: "default" | "full" | "screen";
   children: React.ReactNode;
 }
 
@@ -42,8 +43,14 @@ function DialogModal(props: Props) {
     };
   }, [onClose]);
 
+  const screen = props.size === "screen";
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#0a0a0a]/55 p-4 backdrop-blur-sm sm:p-8">
+    <div
+      className={cn(
+        "fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#0a0a0a]/55 backdrop-blur-sm",
+        screen ? "p-0" : "p-4 sm:p-8",
+      )}
+    >
       <div className="absolute inset-0" onClick={props.onClose} aria-hidden="true" />
       <div
         ref={panelRef}
@@ -52,10 +59,10 @@ function DialogModal(props: Props) {
         aria-modal="true"
         aria-label={props.title}
         className={cn(
-          "relative z-10 my-auto flex w-full flex-col rounded-3xl border border-border bg-card shadow-2xl focus:outline-none motion-safe:animate-[dialog-in_200ms_cubic-bezier(0.22,1,0.36,1)]",
-          props.size === "full"
-            ? "h-[calc(100dvh-4rem)] max-w-[1400px] overflow-hidden"
-            : "max-w-3xl",
+          "relative z-10 my-auto flex w-full flex-col border-border bg-card shadow-2xl focus:outline-none motion-safe:animate-[dialog-in_200ms_cubic-bezier(0.22,1,0.36,1)]",
+          screen && "h-dvh max-w-none overflow-hidden rounded-none border-0",
+          props.size === "full" && "h-[calc(100dvh-4rem)] max-w-[1400px] overflow-hidden rounded-3xl border",
+          !props.size || props.size === "default" ? "max-w-3xl rounded-3xl border" : "",
           props.className,
         )}
       >

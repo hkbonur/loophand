@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  resizeDimensions,
-  rotatedDimensions,
-  extensionFor,
-  opLabel,
-  pipelineSteps,
-} from "./transforms";
+import { resizeDimensions, rotatedDimensions, extensionFor, cropRect } from "./transforms";
 
 describe("resizeDimensions", () => {
   it("preserves aspect ratio", () => {
@@ -33,26 +27,25 @@ describe("extensionFor", () => {
   });
 });
 
-describe("opLabel", () => {
-  it("names each op direction", () => {
-    expect(opLabel({ kind: "rotate", deg: 90 })).toBe("Rotate R");
-    expect(opLabel({ kind: "rotate", deg: 270 })).toBe("Rotate L");
-    expect(opLabel({ kind: "rotate", deg: 180 })).toBe("Rotate 180");
-    expect(opLabel({ kind: "flip", axis: "h" })).toBe("Flip H");
-    expect(opLabel({ kind: "flip", axis: "v" })).toBe("Flip V");
-    expect(opLabel({ kind: "grayscale" })).toBe("Grayscale");
-    expect(opLabel({ kind: "resize", width: 800 })).toBe("Resize 800");
+describe("cropRect", () => {
+  it("snaps to whole pixels", () => {
+    expect(cropRect(200, 100, 10.4, 20.6, 50.5, 30.2)).toEqual({
+      x: 10,
+      y: 21,
+      width: 51,
+      height: 30,
+    });
   });
-});
-
-describe("pipelineSteps", () => {
-  it("leads with Original, then one label per op", () => {
-    expect(pipelineSteps([])).toEqual(["Original"]);
-    expect(
-      pipelineSteps([
-        { kind: "rotate", deg: 90 },
-        { kind: "grayscale" },
-      ]),
-    ).toEqual(["Original", "Rotate R", "Grayscale"]);
+  it("clamps the rectangle to the image bounds", () => {
+    expect(cropRect(200, 100, -20, -10, 300, 200)).toEqual({
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+    });
+  });
+  it("rejects a degenerate selection (a tap or sliver)", () => {
+    expect(cropRect(200, 100, 50, 50, 1, 40)).toBeNull();
+    expect(cropRect(200, 100, 50, 50, 0, 0)).toBeNull();
   });
 });

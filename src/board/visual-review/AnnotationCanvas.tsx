@@ -61,7 +61,7 @@ export function AnnotationCanvas(props: Props) {
   const scale = fitScale(naturalWidth, props.displayWidth);
   const stageWidth = naturalWidth * scale;
   const stageHeight = naturalHeight * scale;
-  const stroke = 2 / scale; // keep a constant on-screen width under the scaled Layer
+  const stroke = 3.5 / scale; // keep a constant on-screen width under the scaled Layer
   const tool = props.activeTool;
   const visible = props.marks.filter((m) => m.viewport === props.viewport);
 
@@ -153,7 +153,16 @@ function MarkShape(props: {
   const { mark, stroke, selected } = props;
   const color = SEVERITY_COLOR[mark.severity];
   const dash = selected ? [stroke * 3, stroke * 2] : undefined;
-  const common = { stroke: color, strokeWidth: stroke, onClick: props.onSelect, onTap: props.onSelect };
+  const common = {
+    stroke: color,
+    strokeWidth: stroke,
+    // A soft white halo lifts the mark off both light and dark artifacts.
+    shadowColor: "#ffffff",
+    shadowBlur: stroke * 1.5,
+    shadowOpacity: 0.85,
+    onClick: props.onSelect,
+    onTap: props.onSelect,
+  };
 
   switch (mark.shape) {
     case "box": {

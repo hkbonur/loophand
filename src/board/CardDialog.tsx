@@ -46,7 +46,7 @@ export function CardDialog(props: Props) {
   const stale = task && firstStatus.current ? staleNotice(firstStatus.current, task) : null;
 
   return (
-    <Dialog open onClose={props.onClose} title={task?.title} size="full">
+    <Dialog open onClose={props.onClose} title={task?.title} size={fullTakeover ? "screen" : "full"}>
       {task === undefined ? (
         <div className="flex flex-1 items-center justify-center p-12">
           <Spinner />

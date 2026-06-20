@@ -1,6 +1,6 @@
 import React from "react";
 import { useMutation, useQuery } from "convex/react";
-import { XIcon, TrashIcon } from "@phosphor-icons/react";
+import { TrashIcon } from "@phosphor-icons/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "../../lib/cn";
@@ -15,8 +15,6 @@ import type { Mark, Severity } from "../../board/visual-review/types";
 
 interface Props {
   task: TaskView;
-  open: boolean;
-  onClose: () => void;
   comments: BoardComment[] | undefined;
   marks: Mark[];
   pinLabels: Record<string, number>;
@@ -29,29 +27,15 @@ interface Props {
   onOpenTask?: (taskId: Id<"tasks">) => void;
 }
 
-// Slide-over panel on the canvas's right edge: the comment thread with the agent,
-// the marks the human has drawn (severity + per-mark note), and the task's
-// details (acceptance criteria, dependencies, delete). A light panel over the
-// dark canvas — the same skin the PDF / HTML studios use.
+// Always-visible panel down the canvas's right edge: the comment thread with the
+// agent, the marks the human has drawn (severity + per-mark note), and the task's
+// details (acceptance criteria, dependencies, delete). A theme-surface column
+// beside the canvas — the same skin the PDF / HTML studios use.
 export function ImageDock(props: Props) {
   return (
-    <aside
-      aria-hidden={!props.open}
-      className={cn(
-        "absolute inset-y-0 right-0 z-30 flex w-full flex-col border-l border-border bg-card shadow-2xl transition-transform duration-200 sm:w-[360px]",
-        props.open ? "translate-x-0" : "pointer-events-none translate-x-full",
-      )}
-    >
-      <header className="flex h-14 flex-none items-center gap-2 border-b border-border px-4">
+    <aside className="flex w-full flex-none flex-col border-l border-border bg-card sm:w-[360px]">
+      <header className="flex h-14 flex-none items-center border-b border-border px-4 pr-12">
         <h2 className="text-sm font-bold text-foreground">Comments &amp; marks</h2>
-        <button
-          type="button"
-          aria-label="Close panel"
-          onClick={props.onClose}
-          className="ml-auto rounded-full p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <XIcon className="h-4 w-4" />
-        </button>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">

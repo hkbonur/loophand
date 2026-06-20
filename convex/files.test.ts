@@ -4,6 +4,7 @@ import { describe, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
+import { MAX_OUTPUT_BYTES, MAX_STORAGE_BYTES_PER_USER } from "./lib/limits";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -293,5 +294,81 @@ describe("named task outputs (fetch_file path)", () => {
 
     // The superseded blob's managedFiles row is reclaimed.
     expect(await t.run((ctx) => ctx.db.get(firstFileId))).toBeNull();
+  });
+});
+
+describe("recordOutput size cap + storage quota", () => {
+  test("rejects an output over the per-artifact size cap", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, taskId } = await setupOutputOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+
+    await claimUpload(t, userId, "outputkey00000big");
+    await expect(
+      asOwner.mutation(api.files.recordOutput, {
+        taskId,
+        name: "huge.pdf",
+        r2Key: "outputkey00000big",
+        contentType: "application/pdf",
+        size: MAX_OUTPUT_BYTES + 1,
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("tracks storageBytes and rejects an output that would exceed the quota", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, taskId } = await setupOutputOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+
+    await claimUpload(t, userId, "outputkey00000001");
+    await asOwner.mutation(api.files.recordOutput, {
+      taskId,
+      name: "a.pdf",
+      r2Key: "outputkey00000001",
+      contentType: "application/pdf",
+      size: 100,
+    });
+    expect(await t.run((ctx) => ctx.db.get(userId).then((u) => u?.storageBytes))).toBe(100);
+
+    // Push the running total to the brink, then a 1-byte add must be rejected.
+    await t.run((ctx) =>
+      ctx.db.patch(userId, { storageBytes: MAX_STORAGE_BYTES_PER_USER }),
+    );
+    await claimUpload(t, userId, "outputkey00000002");
+    await expect(
+      asOwner.mutation(api.files.recordOutput, {
+        taskId,
+        name: "b.pdf",
+        r2Key: "outputkey00000002",
+        contentType: "application/pdf",
+        size: 1,
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("superseding nets the reclaimed bytes out of the quota", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, taskId } = await setupOutputOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+
+    await claimUpload(t, userId, "outputkey0000000a");
+    await asOwner.mutation(api.files.recordOutput, {
+      taskId,
+      name: "item.pdf",
+      r2Key: "outputkey0000000a",
+      contentType: "application/pdf",
+      size: 100,
+    });
+    await claimUpload(t, userId, "outputkey0000000b");
+    await asOwner.mutation(api.files.recordOutput, {
+      taskId,
+      name: "item.pdf",
+      r2Key: "outputkey0000000b",
+      contentType: "application/pdf",
+      size: 30,
+    });
+
+    // 100 reclaimed, 30 added → net 30, not 130.
+    expect(await t.run((ctx) => ctx.db.get(userId).then((u) => u?.storageBytes))).toBe(30);
   });
 });

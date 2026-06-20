@@ -11,6 +11,9 @@ import { internal } from "./_generated/api";
 import { r2, generateR2Key } from "./lib/r2";
 import { requireAuth } from "./lib/auth";
 import { assertOwnedTask } from "./lib/ownership";
+import { assertOutputSize, assertWithinStorageQuota } from "./lib/limits";
+import { rateLimiter } from "./rateLimit";
+import { enforceLimit } from "./lib/rateLimitGuard";
 
 // Minimum hold for an uploaded-but-unreferenced blob: once this lapses the
 // upload is eligible for reclamation by the daily cleanup cron (so actual
@@ -32,6 +35,10 @@ export const registerUpload = internalMutation({
   },
   returns: v.id("managedFiles"),
   handler: async (ctx, args) => {
+    await enforceLimit(
+      () => rateLimiter.limit(ctx, "uploadUrl", { key: args.userId }),
+      "upload",
+    );
     const now = Date.now();
     const fileId = await ctx.db.insert("managedFiles", {
       r2Key: args.r2Key,
@@ -109,6 +116,7 @@ export const startOutputUpload = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
     await assertOwnedTask(ctx, args.taskId, userId);
+    await enforceLimit(() => rateLimiter.limit(ctx, "uploadUrl", { key: userId }), "upload");
     const key = generateR2Key();
     const { url } = await r2.generateUploadUrl(key);
     const now = Date.now();
@@ -139,6 +147,7 @@ export const recordOutput = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
     await assertOwnedTask(ctx, args.taskId, userId);
+    assertOutputSize(args.size);
     // The upload claim proves this user started this exact upload.
     const claim = await ctx.db
       .query("pendingR2Uploads")
@@ -148,7 +157,12 @@ export const recordOutput = mutation({
       throw new ConvexError({ code: "NOT_FOUND", message: "Upload not found." });
     }
 
-    await supersedePriorOutput(ctx, args.taskId, args.name);
+    // Reclaim a same-named prior output first, then quota the net new bytes —
+    // re-recording an output never double-counts (a throw rolls the txn back).
+    const reclaimed = await supersedePriorOutput(ctx, args.taskId, args.name);
+    const user = await ctx.db.get(userId);
+    const current = user?.storageBytes ?? 0;
+    assertWithinStorageQuota(current - reclaimed, args.size);
 
     const now = Date.now();
     const fileId = await ctx.db.insert("managedFiles", {
@@ -165,34 +179,38 @@ export const recordOutput = mutation({
       createdAt: now,
     });
     await ctx.db.delete(claim._id);
+    await ctx.db.patch(userId, { storageBytes: current - reclaimed + args.size });
     return fileId;
   },
 });
 
 // Drop an existing output reference for (task, name) and reclaim its blob if no
 // other reference points at it. Keeps "last write wins" for an output name.
+// Returns the bytes actually reclaimed (the blob's size when deleted, else 0) so
+// the caller can net them out of the owner's storage quota.
 async function supersedePriorOutput(
   ctx: MutationCtx,
   taskId: Id<"tasks">,
   name: string,
-): Promise<void> {
+): Promise<number> {
   const prior = await ctx.db
     .query("managedFileReferences")
     .withIndex("by_owner_name", (q) =>
       q.eq("ownerType", "task").eq("ownerId", taskId).eq("name", name),
     )
     .first();
-  if (!prior) return;
+  if (!prior) return 0;
   await ctx.db.delete(prior._id);
   const stillReferenced = await ctx.db
     .query("managedFileReferences")
     .withIndex("by_file", (q) => q.eq("fileId", prior.fileId))
     .first();
-  if (stillReferenced) return;
+  if (stillReferenced) return 0;
   const file = await ctx.db.get(prior.fileId);
-  if (!file) return;
+  if (!file) return 0;
   await ctx.db.delete(file._id);
   await ctx.scheduler.runAfter(0, internal.files.deleteBlob, { r2Key: file.r2Key });
+  return file.size ?? 0;
 }
 
 // Resolve (task, output name) → the stored blob's R2 key for an owning agent.

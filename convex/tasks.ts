@@ -33,6 +33,7 @@ import { resolveForProject } from "./preferences";
 import { rateLimiter } from "./rateLimit";
 import { enforceLimit } from "./lib/rateLimitGuard";
 import { initialTaskState } from "./lib/deps";
+import { assertItemCount } from "./lib/limits";
 import { maybeNotifyOwner } from "./lib/notifyOwner";
 import { insertTaskRecord } from "./lib/taskInsert";
 import { resolveDeps, unblockDependents, failDependents } from "./deps";
@@ -314,6 +315,7 @@ export const createForAgent = internalMutation({
         message: "Pass either items[] (multi-item) or tool_payload (single), not both.",
       });
     }
+    if (items) assertItemCount(items.length);
 
     // A doc_review carries one render spec per item (even a single doc is a
     // one-item rail) — there's no tool_payload surface for it.

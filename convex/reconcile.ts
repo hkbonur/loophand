@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internalMutation, type MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { countSettled } from "./lib/items";
 import { recomputeProgress } from "./items";
 
@@ -28,6 +29,54 @@ export const itemCounts = internalMutation({
         .collect();
       if (countSettled(items) === (task.itemsDone ?? 0)) continue;
       await recomputeProgress(ctx, task._id);
+      repaired++;
+    }
+    return { scanned, repaired };
+  },
+});
+
+// Recompute a user's metered storage from the live references: the distinct
+// output blobs (a `name`-bearing task reference) attached to their tasks. Inputs
+// are not metered, so unnamed references are skipped. Mirrors how recordOutput +
+// supersede maintain users.storageBytes.
+async function userOutputBytes(ctx: MutationCtx, userId: Id<"users">): Promise<number> {
+  const tasks = await ctx.db
+    .query("tasks")
+    .withIndex("by_user_status", (q) => q.eq("userId", userId))
+    .collect();
+  const counted = new Set<Id<"managedFiles">>();
+  let total = 0;
+  for (const task of tasks) {
+    const refs = await ctx.db
+      .query("managedFileReferences")
+      .withIndex("by_owner", (q) => q.eq("ownerType", "task").eq("ownerId", task._id))
+      .collect();
+    for (const ref of refs) {
+      if (ref.name === undefined || counted.has(ref.fileId)) continue;
+      counted.add(ref.fileId);
+      const file = await ctx.db.get(ref.fileId);
+      total += file?.size ?? 0;
+    }
+  }
+  return total;
+}
+
+// Nightly drift backstop for the storage quota. The counter is kept correct
+// transactionally by files.recordOutput / supersede, but a crash mid-mutation or
+// a future free-without-decrement path could leave it stale; recompute from the
+// live references and repair only on a mismatch.
+export const storageBytes = internalMutation({
+  args: {},
+  returns: v.object({ scanned: v.number(), repaired: v.number() }),
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").take(SCAN_LIMIT);
+    let scanned = 0;
+    let repaired = 0;
+    for (const user of users) {
+      scanned++;
+      const actual = await userOutputBytes(ctx, user._id);
+      if ((user.storageBytes ?? 0) === actual) continue;
+      await ctx.db.patch(user._id, { storageBytes: actual });
       repaired++;
     }
     return { scanned, repaired };

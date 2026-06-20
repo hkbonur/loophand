@@ -61,6 +61,10 @@ export default defineSchema({
     createdAt: v.optional(v.number()),
     // Throttle clock for owner push notifications (see tasks.maybeNotifyOwner).
     lastNotifiedAt: v.optional(v.number()),
+    // Running total of referenced output-artifact bytes, for the storage quota
+    // (Phase 6). Maintained by files.recordOutput (+) and supersede reclaim (−);
+    // absent = 0. Outputs only — screenshot inputs are size-capped + cron-reclaimed.
+    storageBytes: v.optional(v.number()),
   }).index("by_email", ["email"]),
 
   // Bearer credentials, bound to `userId`. `api_key` = user-minted;

@@ -4,6 +4,7 @@ import { describe, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
+import { MAX_ACTIVE_SCHEDULES } from "./lib/limits";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -299,5 +300,42 @@ describe("schedules.tick", () => {
     expect(res.materialized).toBe(0);
     expect((await t.run((ctx) => ctx.db.get(id)))?.enabled).toBe(false);
     expect(await countTasks(t)).toHaveLength(0);
+  });
+});
+
+describe("active-schedule cap", () => {
+  test("rejects creating past the active-schedule cap", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await setupUser(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+
+    for (let i = 0; i < MAX_ACTIVE_SCHEDULES; i++) await insertSchedule(t, userId);
+
+    await expect(
+      asOwner.mutation(api.schedules.create, {
+        name: "one too many",
+        cron: "0 9 * * *",
+        timezone: "UTC",
+        taskTemplate: template,
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("disabled schedules don't count against the cap", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await setupUser(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+
+    for (let i = 0; i < MAX_ACTIVE_SCHEDULES - 1; i++) await insertSchedule(t, userId);
+    await insertSchedule(t, userId, { enabled: false });
+
+    // At the cap on total rows but one is disabled, so one create still fits.
+    const id = await asOwner.mutation(api.schedules.create, {
+      name: "fits",
+      cron: "0 9 * * *",
+      timezone: "UTC",
+      taskTemplate: template,
+    });
+    expect(await t.run((ctx) => ctx.db.get(id))).not.toBeNull();
   });
 });

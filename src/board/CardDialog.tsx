@@ -15,6 +15,7 @@ import { staleNotice } from "./staleNotice";
 import { AgentChip } from "./AgentChip";
 import { DepMiniView } from "./DepMiniView";
 import { CommentsSection } from "./comments/CommentsSection";
+import { ConfirmDeleteTask } from "./ConfirmDeleteTask";
 import { useAgents } from "./useAgents";
 import type { TaskView } from "./types";
 
@@ -58,12 +59,12 @@ export function CardDialog(props: Props) {
             // Wide surfaces stack details on top, then the full-width surface.
             // Extra top padding on desktop clears the corner close button.
             <div className="flex flex-col gap-6 px-6 pb-6 pt-6 sm:pt-12">
-              <TaskDetails task={task} onOpenTask={props.onOpenTask} />
+              <TaskDetails task={task} onOpenTask={props.onOpenTask} onClose={props.onClose} />
               <TaskPanel task={task} onResolved={props.onClose} />
             </div>
           ) : (
             <div className="grid gap-6 px-6 pb-6 pt-6 sm:pt-12 sm:grid-cols-[1.2fr_1fr]">
-              <TaskDetails task={task} onOpenTask={props.onOpenTask} />
+              <TaskDetails task={task} onOpenTask={props.onOpenTask} onClose={props.onClose} />
               <div className="border-t border-border pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
                 <TaskPanel task={task} onResolved={props.onClose} />
               </div>
@@ -83,7 +84,11 @@ function StaleBanner(props: { message: string }) {
   );
 }
 
-function TaskDetails(props: { task: TaskView; onOpenTask?: (taskId: Id<"tasks">) => void }) {
+function TaskDetails(props: {
+  task: TaskView;
+  onOpenTask?: (taskId: Id<"tasks">) => void;
+  onClose: () => void;
+}) {
   const task = props.task;
   const agents = useAgents();
   const setTags = useMutation(api.tasks.setTags);
@@ -132,7 +137,34 @@ function TaskDetails(props: { task: TaskView; onOpenTask?: (taskId: Id<"tasks">)
         <DepMiniView blockedBy={deps.blockedBy} blocks={deps.blocks} onOpen={props.onOpenTask} />
       ) : null}
       <TaskComments taskId={task._id} />
+      <DeleteTaskAction taskId={task._id} taskTitle={task.title} onDeleted={props.onClose} />
     </div>
+  );
+}
+
+// Container: owns the deleteTask mutation; the typed-confirm UX lives in
+// ConfirmDeleteTask. Closes the dialog once the task is gone.
+function DeleteTaskAction(props: {
+  taskId: Id<"tasks">;
+  taskTitle: string;
+  onDeleted: () => void;
+}) {
+  const deleteTask = useMutation(api.tasks.deleteTask);
+  const [deleting, setDeleting] = React.useState(false);
+
+  const onConfirm = async () => {
+    setDeleting(true);
+    try {
+      await deleteTask({ taskId: props.taskId });
+      props.onDeleted();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not delete the task.");
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <ConfirmDeleteTask taskTitle={props.taskTitle} onConfirm={onConfirm} deleting={deleting} />
   );
 }
 

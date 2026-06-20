@@ -8,9 +8,20 @@ import { nextSlot, isValidCron, isValidTimezone } from "./lib/cron";
 import { normalizeTags } from "./lib/tags";
 import { maybeNotifyOwner } from "./lib/notifyOwner";
 import { insertTaskRecord } from "./lib/taskInsert";
+import { assertActiveScheduleBudget } from "./lib/limits";
 
 // How many due schedules one tick materializes (full quotas in Phase 6).
 const TICK_BATCH = 100;
+
+// Count a user's enabled schedules — the cap is on active fan-out, so disabled
+// schedules don't count against it.
+async function countActiveSchedules(ctx: MutationCtx, userId: Id<"users">): Promise<number> {
+  const rows = await ctx.db
+    .query("schedules")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+  return rows.filter((s) => s.enabled).length;
+}
 
 // The create_task payload a schedule materializes each slot. Validated here so a
 // bad template is rejected at schedule-create rather than failing every tick.
@@ -67,6 +78,7 @@ export const create = mutation({
     const userId = await requireAuth(ctx);
     assertValidSchedule(args.cron, args.timezone, args.taskTemplate.type);
     if (args.projectId) await assertOwnedProject(ctx, args.projectId, userId);
+    assertActiveScheduleBudget(await countActiveSchedules(ctx, userId));
 
     const now = Date.now();
     return ctx.db.insert("schedules", {
@@ -101,6 +113,7 @@ export const createScheduleForAgent = internalMutation({
   handler: async (ctx, args) => {
     const timezone = args.timezone ?? "UTC";
     assertValidSchedule(args.cron, timezone, args.taskTemplate.type);
+    assertActiveScheduleBudget(await countActiveSchedules(ctx, args.userId));
 
     let projectId: Id<"projects"> | undefined;
     if (args.project) {

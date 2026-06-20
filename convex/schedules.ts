@@ -10,7 +10,8 @@ import { maybeNotifyOwner } from "./lib/notifyOwner";
 import { insertTaskRecord } from "./lib/taskInsert";
 import { assertActiveScheduleBudget } from "./lib/limits";
 
-// How many due schedules one tick materializes (full quotas in Phase 6).
+// How many due schedules one tick materializes per minute. Total fan-out is
+// bounded separately by the per-user active-schedule cap (assertActiveScheduleBudget).
 const TICK_BATCH = 100;
 
 // Count a user's enabled schedules — the cap is on active fan-out, so disabled

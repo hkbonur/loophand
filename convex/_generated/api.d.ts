@@ -51,6 +51,7 @@ import type * as lib_cron from "../lib/cron.js";
 import type * as lib_deps from "../lib/deps.js";
 import type * as lib_email from "../lib/email.js";
 import type * as lib_items from "../lib/items.js";
+import type * as lib_limits from "../lib/limits.js";
 import type * as lib_logger from "../lib/logger.js";
 import type * as lib_notifyOwner from "../lib/notifyOwner.js";
 import type * as lib_ownership from "../lib/ownership.js";
@@ -126,6 +127,7 @@ declare const fullApi: ApiFromModules<{
   "lib/deps": typeof lib_deps;
   "lib/email": typeof lib_email;
   "lib/items": typeof lib_items;
+  "lib/limits": typeof lib_limits;
   "lib/logger": typeof lib_logger;
   "lib/notifyOwner": typeof lib_notifyOwner;
   "lib/ownership": typeof lib_ownership;

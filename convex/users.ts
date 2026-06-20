@@ -48,7 +48,16 @@ export const ensureUser = mutation({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
-    const authUser = await authComponent.getAuthUser(ctx);
+    // getAuthUser round-trips Better Auth and can throw BetterFetchError
+    // ("HTTPError") when the session token is stale — e.g. an idle tab past the
+    // 15-min JWT horizon. Swallow it and fall back to the Convex identity:
+    // never turn a transient auth blip into a Convex 500. Mirrors getProvider.
+    let authUser: Awaited<ReturnType<typeof authComponent.getAuthUser>> | null = null;
+    try {
+      authUser = await authComponent.getAuthUser(ctx);
+    } catch {
+      authUser = null;
+    }
     const email = authUser?.email ?? identity.email;
     if (!email) return null;
 

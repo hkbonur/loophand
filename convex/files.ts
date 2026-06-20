@@ -218,6 +218,32 @@ async function supersedePriorOutput(
   return file.size ?? 0;
 }
 
+// Drop every reference a task owns and reclaim each blob that ends up with no
+// remaining reference (its managedFiles row is deleted and the R2 object freed).
+// Returns the total reclaimed bytes so the caller can decrement the owner's
+// storage quota. Used by task deletion.
+export async function reclaimTaskBlobs(ctx: MutationCtx, taskId: Id<"tasks">): Promise<number> {
+  const refs = await ctx.db
+    .query("managedFileReferences")
+    .withIndex("by_owner", (q) => q.eq("ownerType", "task").eq("ownerId", taskId))
+    .collect();
+  let reclaimed = 0;
+  for (const ref of refs) {
+    await ctx.db.delete(ref._id);
+    const stillReferenced = await ctx.db
+      .query("managedFileReferences")
+      .withIndex("by_file", (q) => q.eq("fileId", ref.fileId))
+      .first();
+    if (stillReferenced) continue;
+    const file = await ctx.db.get(ref.fileId);
+    if (!file) continue;
+    await ctx.db.delete(file._id);
+    await ctx.scheduler.runAfter(0, internal.files.deleteBlob, { r2Key: file.r2Key });
+    reclaimed += file.size ?? 0;
+  }
+  return reclaimed;
+}
+
 // Resolve (task, output name) → the stored blob's R2 key for an owning agent.
 // The owner check + name lookup live here (pure DB, no network); the MCP
 // fetch_file tool signs a short-TTL URL from the key. A foreign task, an unknown

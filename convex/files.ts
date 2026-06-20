@@ -80,11 +80,14 @@ export async function assertUploadOwnedBy(
 }
 
 // Bind an uploaded blob to a task and consume its uploader claim. After this a
-// re-reference of the same file fails ownership — one upload, one task.
+// re-reference of the same file fails ownership — one upload, one task. The
+// blob now counts toward the owner's storage quota (an attached input is metered
+// the same as a recorded output; the caller passes the owning userId).
 export async function attachUploadToTask(
   ctx: MutationCtx,
   file: Doc<"managedFiles">,
   taskId: Id<"tasks">,
+  userId: Id<"users">,
 ): Promise<void> {
   await ctx.db.insert("managedFileReferences", {
     fileId: file._id,
@@ -97,6 +100,8 @@ export async function attachUploadToTask(
     .withIndex("by_r2Key", (q) => q.eq("r2Key", file.r2Key))
     .first();
   if (claim) await ctx.db.delete(claim._id);
+  const user = await ctx.db.get(userId);
+  await ctx.db.patch(userId, { storageBytes: (user?.storageBytes ?? 0) + (file.size ?? 0) });
 }
 
 // ── Human-produced outputs (browser → R2, session-authenticated) ─────────────
@@ -211,6 +216,32 @@ async function supersedePriorOutput(
   await ctx.db.delete(file._id);
   await ctx.scheduler.runAfter(0, internal.files.deleteBlob, { r2Key: file.r2Key });
   return file.size ?? 0;
+}
+
+// Drop every reference a task owns and reclaim each blob that ends up with no
+// remaining reference (its managedFiles row is deleted and the R2 object freed).
+// Returns the total reclaimed bytes so the caller can decrement the owner's
+// storage quota. Used by task deletion.
+export async function reclaimTaskBlobs(ctx: MutationCtx, taskId: Id<"tasks">): Promise<number> {
+  const refs = await ctx.db
+    .query("managedFileReferences")
+    .withIndex("by_owner", (q) => q.eq("ownerType", "task").eq("ownerId", taskId))
+    .collect();
+  let reclaimed = 0;
+  for (const ref of refs) {
+    await ctx.db.delete(ref._id);
+    const stillReferenced = await ctx.db
+      .query("managedFileReferences")
+      .withIndex("by_file", (q) => q.eq("fileId", ref.fileId))
+      .first();
+    if (stillReferenced) continue;
+    const file = await ctx.db.get(ref.fileId);
+    if (!file) continue;
+    await ctx.db.delete(file._id);
+    await ctx.scheduler.runAfter(0, internal.files.deleteBlob, { r2Key: file.r2Key });
+    reclaimed += file.size ?? 0;
+  }
+  return reclaimed;
 }
 
 // Resolve (task, output name) → the stored blob's R2 key for an owning agent.

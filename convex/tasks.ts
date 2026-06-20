@@ -12,7 +12,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { requireAuth } from "./lib/auth";
 import { assertOwnedTask, assertOwnedProject } from "./lib/ownership";
 import { ensureDefaultProject, findProjectByName } from "./lib/projectHelpers";
-import { assertUploadOwnedBy, attachUploadToTask } from "./files";
+import { assertUploadOwnedBy, attachUploadToTask, reclaimTaskBlobs } from "./files";
 import { storageProxyUrl } from "./lib/r2";
 import {
   TASK_STATUSES,
@@ -33,7 +33,7 @@ import { resolveForProject } from "./preferences";
 import { rateLimiter } from "./rateLimit";
 import { enforceLimit } from "./lib/rateLimitGuard";
 import { initialTaskState } from "./lib/deps";
-import { assertItemCount } from "./lib/limits";
+import { assertItemCount, assertWithinStorageQuota } from "./lib/limits";
 import { maybeNotifyOwner } from "./lib/notifyOwner";
 import { insertTaskRecord } from "./lib/taskInsert";
 import { resolveDeps, unblockDependents, failDependents } from "./deps";
@@ -360,6 +360,13 @@ export const createForAgent = internalMutation({
       ? { screenshotFileId: screenshotFile._id, viewports: args.toolPayload?.viewports }
       : undefined;
 
+    // An attached screenshot is metered storage — reject the create if it would
+    // push the owner over quota (the attach below does the increment).
+    if (screenshotFile) {
+      const owner = await ctx.db.get(args.userId);
+      assertWithinStorageQuota(owner?.storageBytes ?? 0, screenshotFile.size ?? 0);
+    }
+
     const now = Date.now();
     const expiresAt =
       args.ttlSeconds && args.ttlSeconds > 0 ? now + args.ttlSeconds * 1000 : undefined;
@@ -411,7 +418,7 @@ export const createForAgent = internalMutation({
       }
     }
 
-    if (screenshotFile) await attachUploadToTask(ctx, screenshotFile, taskId);
+    if (screenshotFile) await attachUploadToTask(ctx, screenshotFile, taskId, args.userId);
 
     if (expiresAt) await ctx.scheduler.runAt(expiresAt, internal.tasks.expire, { taskId });
     // A future notBefore needs a timer to release the task even if its deps are
@@ -768,6 +775,67 @@ export const close = mutation({
       toStatus: "done",
       createdAt: now,
     });
+    return null;
+  },
+});
+
+// Owner-only hard delete: removes the task and everything hanging off it (items,
+// its outgoing dep edges, comments, activity, audit) and reclaims its R2 blobs,
+// decrementing the storage quota. Refused while another task depends on this one
+// so a delete can't strand a blocked dependent — cancel/delete those first.
+export const deleteTask = mutation({
+  args: { taskId: v.id("tasks") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    await assertOwnedTask(ctx, args.taskId, userId);
+
+    const dependent = await ctx.db
+      .query("taskDeps")
+      .withIndex("by_dependsOn", (q) => q.eq("dependsOnTaskId", args.taskId))
+      .first();
+    if (dependent) {
+      throw new ConvexError({
+        code: "CONFLICT",
+        message: "Another task depends on this one. Delete or cancel the dependents first.",
+      });
+    }
+
+    for (const items of await ctx.db
+      .query("taskItems")
+      .withIndex("by_task_order", (q) => q.eq("taskId", args.taskId))
+      .collect())
+      await ctx.db.delete(items._id);
+    for (const dep of await ctx.db
+      .query("taskDeps")
+      .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+      .collect())
+      await ctx.db.delete(dep._id);
+    for (const comment of await ctx.db
+      .query("taskComments")
+      .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+      .collect())
+      await ctx.db.delete(comment._id);
+    for (const activity of await ctx.db
+      .query("taskActivity")
+      .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+      .collect())
+      await ctx.db.delete(activity._id);
+    for (const audit of await ctx.db
+      .query("taskAudit")
+      .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+      .collect())
+      await ctx.db.delete(audit._id);
+
+    const reclaimed = await reclaimTaskBlobs(ctx, args.taskId);
+    await ctx.db.delete(args.taskId);
+
+    if (reclaimed > 0) {
+      const user = await ctx.db.get(userId);
+      await ctx.db.patch(userId, {
+        storageBytes: Math.max(0, (user?.storageBytes ?? 0) - reclaimed),
+      });
+    }
     return null;
   },
 });

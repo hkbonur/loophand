@@ -35,11 +35,11 @@ export const itemCounts = internalMutation({
   },
 });
 
-// Recompute a user's metered storage from the live references: the distinct
-// output blobs (a `name`-bearing task reference) attached to their tasks. Inputs
-// are not metered, so unnamed references are skipped. Mirrors how recordOutput +
-// supersede maintain users.storageBytes.
-async function userOutputBytes(ctx: MutationCtx, userId: Id<"users">): Promise<number> {
+// Recompute a user's metered storage from the live references: every distinct
+// blob attached to their tasks — inputs (an attached screenshot) and outputs (a
+// recorded artifact) alike. Mirrors how attachUploadToTask / recordOutput /
+// supersede / deleteTask maintain users.storageBytes.
+async function userReferencedBytes(ctx: MutationCtx, userId: Id<"users">): Promise<number> {
   const tasks = await ctx.db
     .query("tasks")
     .withIndex("by_user_status", (q) => q.eq("userId", userId))
@@ -52,7 +52,7 @@ async function userOutputBytes(ctx: MutationCtx, userId: Id<"users">): Promise<n
       .withIndex("by_owner", (q) => q.eq("ownerType", "task").eq("ownerId", task._id))
       .collect();
     for (const ref of refs) {
-      if (ref.name === undefined || counted.has(ref.fileId)) continue;
+      if (counted.has(ref.fileId)) continue;
       counted.add(ref.fileId);
       const file = await ctx.db.get(ref.fileId);
       total += file?.size ?? 0;
@@ -74,7 +74,7 @@ export const storageBytes = internalMutation({
     let repaired = 0;
     for (const user of users) {
       scanned++;
-      const actual = await userOutputBytes(ctx, user._id);
+      const actual = await userReferencedBytes(ctx, user._id);
       if ((user.storageBytes ?? 0) === actual) continue;
       await ctx.db.patch(user._id, { storageBytes: actual });
       repaired++;

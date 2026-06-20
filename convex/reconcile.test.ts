@@ -77,15 +77,16 @@ describe("reconcile.storageBytes", () => {
     expect(await storageOf(t, userId)).toBe(100);
   });
 
-  test("does not meter unnamed (input) references", async () => {
+  test("meters unnamed (input) references too", async () => {
     const t = convexTest(schema, modules);
     const { userId } = await setupWithOutput(t, "owner@example.com", 100, {
-      storageBytes: 100,
+      storageBytes: 999,
       named: false,
     });
 
-    await t.mutation(internal.reconcile.storageBytes, {});
-    // Input ref doesn't count → recomputed total is 0, so the stale 100 is fixed.
-    expect(await storageOf(t, userId)).toBe(0);
+    const res = await t.mutation(internal.reconcile.storageBytes, {});
+    // Attached inputs are metered like outputs → recomputed total is 100.
+    expect(res.repaired).toBe(1);
+    expect(await storageOf(t, userId)).toBe(100);
   });
 });

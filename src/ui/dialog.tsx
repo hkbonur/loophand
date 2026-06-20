@@ -9,6 +9,9 @@ interface Props {
   onClose: () => void;
   title?: string;
   className?: string;
+  // "full" near-fills the viewport (a tall working canvas); content scrolls
+  // inside the panel rather than growing the overlay.
+  size?: "default" | "full";
   children: React.ReactNode;
 }
 
@@ -49,7 +52,10 @@ function DialogModal(props: Props) {
         aria-modal="true"
         aria-label={props.title}
         className={cn(
-          "relative z-10 my-auto w-full max-w-3xl rounded-3xl border border-border bg-card shadow-2xl focus:outline-none motion-safe:animate-[dialog-in_200ms_cubic-bezier(0.22,1,0.36,1)]",
+          "relative z-10 my-auto flex w-full flex-col rounded-3xl border border-border bg-card shadow-2xl focus:outline-none motion-safe:animate-[dialog-in_200ms_cubic-bezier(0.22,1,0.36,1)]",
+          props.size === "full"
+            ? "h-[calc(100dvh-4rem)] max-w-[1400px] overflow-hidden"
+            : "max-w-3xl",
           props.className,
         )}
       >

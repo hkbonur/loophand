@@ -6,6 +6,7 @@ import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { Spinner } from "../ui/spinner";
 import { toast } from "../ui/toaster";
+import { SectionLabel } from "./SectionLabel";
 import type { TaskView } from "./types";
 
 type Action = "approve" | "request_changes" | "cancel";
@@ -54,13 +55,16 @@ export function ApprovalPanel(props: Props) {
   );
 
   return (
-    <div className="flex flex-col gap-3">
-      <Textarea
-        value={comment}
-        onChange={setComment}
-        rows={4}
-        placeholder="Add a note for the agent (required for changes, optional otherwise)…"
-      />
+    <div className="flex flex-col gap-4 sm:sticky sm:top-12">
+      <div>
+        <SectionLabel>Your decision</SectionLabel>
+        <Textarea
+          value={comment}
+          onChange={setComment}
+          rows={4}
+          placeholder="Add a note for the agent (required for changes, optional otherwise)…"
+        />
+      </div>
       <div className="flex flex-wrap gap-2">
         <Button disabled={pending !== null} onClick={() => submit("approve")}>
           {pending === "approve" ? (

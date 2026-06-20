@@ -6,6 +6,8 @@ interface Props {
   onClose: () => void;
   title?: string;
   className?: string;
+  // "full" pins the sheet to a tall height instead of fitting its content.
+  size?: "default" | "full";
   children: React.ReactNode;
 }
 
@@ -77,7 +79,8 @@ export function Drawer(props: Props) {
             : undefined
         }
         className={cn(
-          "relative z-10 flex max-h-[92vh] w-full flex-col rounded-t-3xl border-t border-border bg-card shadow-2xl focus:outline-none",
+          "relative z-10 flex w-full flex-col rounded-t-3xl border-t border-border bg-card shadow-2xl focus:outline-none",
+          props.size === "full" ? "h-[92vh]" : "max-h-[92vh]",
           !hasDragged && "motion-safe:animate-[drawer-up_320ms_cubic-bezier(0.22,1,0.36,1)]",
           props.className,
         )}

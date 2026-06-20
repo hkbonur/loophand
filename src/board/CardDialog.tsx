@@ -40,30 +40,25 @@ export function CardDialog(props: Props) {
   const stale = task && firstStatus.current ? staleNotice(firstStatus.current, task) : null;
 
   return (
-    <Dialog
-      open
-      onClose={props.onClose}
-      title={task?.title}
-      className={isWide ? "max-w-5xl" : undefined}
-    >
+    <Dialog open onClose={props.onClose} title={task?.title} size="full">
       {task === undefined ? (
-        <div className="flex items-center justify-center p-12">
+        <div className="flex flex-1 items-center justify-center p-12">
           <Spinner />
         </div>
       ) : task === null ? (
         <div className="p-8 text-sm text-muted-foreground">This task is no longer available.</div>
       ) : (
-        <div className="flex flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           {stale ? <StaleBanner message={stale} /> : null}
           {isWide ? (
             // Wide surfaces stack details on top, then the full-width surface.
             // Extra top padding on desktop clears the corner close button.
-            <div className="flex flex-col gap-6 px-6 pb-6 pt-6 sm:pt-12">
+            <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 pb-6 pt-6 sm:pt-12">
               <TaskDetails task={task} onOpenTask={props.onOpenTask} onClose={props.onClose} />
               <TaskPanel task={task} onResolved={props.onClose} />
             </div>
           ) : (
-            <div className="grid gap-6 px-6 pb-6 pt-6 sm:pt-12 sm:grid-cols-[1.2fr_1fr]">
+            <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto px-6 pb-6 pt-6 sm:pt-12 sm:grid-cols-[1.2fr_1fr]">
               <TaskDetails task={task} onOpenTask={props.onOpenTask} onClose={props.onClose} />
               <div className="border-t border-border pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
                 <TaskPanel task={task} onResolved={props.onClose} />
@@ -104,10 +99,12 @@ function TaskDetails(props: {
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-5">
       <div>
         <p className="island-kicker mb-1.5">{task.type.replace(/_/g, " ")}</p>
-        <h2 className="text-lg font-bold leading-tight text-foreground">{task.title}</h2>
+        <h2 className="text-xl font-bold leading-tight tracking-tight text-foreground">
+          {task.title}
+        </h2>
       </div>
       {creator !== undefined || resumer !== undefined ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -137,7 +134,9 @@ function TaskDetails(props: {
         <DepMiniView blockedBy={deps.blockedBy} blocks={deps.blocks} onOpen={props.onOpenTask} />
       ) : null}
       <TaskComments taskId={task._id} />
-      <DeleteTaskAction taskId={task._id} taskTitle={task.title} onDeleted={props.onClose} />
+      <div className="mt-1 border-t border-border pt-4">
+        <DeleteTaskAction taskId={task._id} taskTitle={task.title} onDeleted={props.onClose} />
+      </div>
     </div>
   );
 }

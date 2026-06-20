@@ -40,6 +40,7 @@
     "better-auth": "^1.6.19",
     "clsx": "^2.1.1",
     "convex": "^1.41.0",
+    "cron-parser": "^5.5.0",
     "konva": "^10.3.0",
     "oxfmt": "^0.55.0",
     "oxlint": "^1.70.0",

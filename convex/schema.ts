@@ -263,15 +263,31 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_task", ["taskId"]),
 
+  // Recurring task templates (Phase 5). `tick` materializes one task per due
+  // slot. Idempotency hinges on advancing `nextRunAt` before creating and on a
+  // per-slot idempotency key; `lastMaterializedSlot` records the last fired slot.
   schedules: defineTable({
     userId: v.id("users"),
     projectId: v.optional(v.id("projects")),
+    // Agent that minted the schedule (via schedule_cron) — used for attribution
+    // and to auto-disable the schedule if the token is revoked. Absent for
+    // human-created schedules.
+    createdByTokenId: v.optional(v.id("apiTokens")),
+    name: v.string(),
+    // The create_task payload to materialize each slot.
     taskTemplate: v.any(),
+    cron: v.string(),
+    timezone: v.string(),
+    // Skip a slot if the previous materialized task is still unresolved.
+    skipIfPrevOpen: v.boolean(),
+    lastTaskId: v.optional(v.id("tasks")),
+    lastMaterializedSlot: v.optional(v.number()),
     nextRunAt: v.number(),
-    cron: v.optional(v.string()),
     enabled: v.boolean(),
     createdAt: v.number(),
-  }).index("by_next_run", ["nextRunAt"]),
+  })
+    .index("by_next_run", ["nextRunAt"])
+    .index("by_user", ["userId"]),
 
   pushSubscriptions: defineTable({
     userId: v.id("users"),

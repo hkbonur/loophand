@@ -83,6 +83,51 @@ export const create = mutation({
   },
 });
 
+// Agent path (trusted userId + tokenId from token auth): create_task with a
+// schedule_cron lands here instead of creating a one-off task.
+export const createScheduleForAgent = internalMutation({
+  args: {
+    userId: v.id("users"),
+    tokenId: v.id("apiTokens"),
+    project: v.optional(v.string()),
+    name: v.optional(v.string()),
+    cron: v.string(),
+    timezone: v.optional(v.string()),
+    skipIfPrevOpen: v.optional(v.boolean()),
+    taskTemplate: templateValidator,
+  },
+  returns: v.object({ schedule_id: v.id("schedules"), next_run_at: v.number() }),
+  handler: async (ctx, args) => {
+    const timezone = args.timezone ?? "UTC";
+    assertValidSchedule(args.cron, timezone, args.taskTemplate.type);
+
+    let projectId: Id<"projects"> | undefined;
+    if (args.project) {
+      const pid = ctx.db.normalizeId("projects", args.project);
+      if (!pid) throw new ConvexError({ code: "NOT_FOUND", message: "Project not found" });
+      await assertOwnedProject(ctx, pid, args.userId);
+      projectId = pid;
+    }
+
+    const now = Date.now();
+    const nextRunAt = nextSlot(args.cron, timezone, now);
+    const id = await ctx.db.insert("schedules", {
+      userId: args.userId,
+      projectId,
+      createdByTokenId: args.tokenId,
+      name: args.name?.trim() || args.taskTemplate.title,
+      taskTemplate: args.taskTemplate,
+      cron: args.cron,
+      timezone,
+      skipIfPrevOpen: args.skipIfPrevOpen ?? false,
+      nextRunAt,
+      enabled: true,
+      createdAt: now,
+    });
+    return { schedule_id: id, next_run_at: nextRunAt };
+  },
+});
+
 export const list = query({
   args: {},
   returns: v.array(scheduleView),

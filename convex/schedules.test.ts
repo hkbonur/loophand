@@ -162,6 +162,62 @@ describe("schedules.list / setEnabled / remove", () => {
   });
 });
 
+describe("schedules.createScheduleForAgent", () => {
+  test("creates a token-attributed schedule from the agent path", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await setupUser(t, "owner@example.com");
+    const tokenId = await t.run((ctx) =>
+      ctx.db.insert("apiTokens", {
+        userId,
+        tokenType: "api_key" as const,
+        name: "agent",
+        tokenHash: "h",
+        tokenPrefix: "lh_x",
+        scope: "tasks:write",
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 1_000_000,
+      }),
+    );
+
+    const res = await t.mutation(internal.schedules.createScheduleForAgent, {
+      userId,
+      tokenId,
+      cron: "0 9 * * *",
+      timezone: "America/New_York",
+      taskTemplate: template,
+    });
+    expect(res.next_run_at).toBeGreaterThan(Date.now());
+    const row = await t.run((ctx) => ctx.db.get(res.schedule_id));
+    expect(row?.createdByTokenId).toBe(tokenId);
+    expect(row?.timezone).toBe("America/New_York");
+  });
+
+  test("rejects an invalid cron from the agent path", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await setupUser(t, "owner@example.com");
+    const tokenId = await t.run((ctx) =>
+      ctx.db.insert("apiTokens", {
+        userId,
+        tokenType: "api_key" as const,
+        name: "agent",
+        tokenHash: "h2",
+        tokenPrefix: "lh_y",
+        scope: "tasks:write",
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 1_000_000,
+      }),
+    );
+    await expect(
+      t.mutation(internal.schedules.createScheduleForAgent, {
+        userId,
+        tokenId,
+        cron: "nope",
+        taskTemplate: template,
+      }),
+    ).rejects.toThrow();
+  });
+});
+
 describe("schedules.tick", () => {
   test("materializes one open task for a due slot and advances nextRunAt", async () => {
     const t = convexTest(schema, modules);

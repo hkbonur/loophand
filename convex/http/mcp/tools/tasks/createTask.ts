@@ -64,6 +64,20 @@ const schema = z.object({
     .positive()
     .optional()
     .describe("Unix epoch ms; the task stays blocked until this time, then opens."),
+  schedule_cron: z
+    .string()
+    .optional()
+    .describe(
+      "5-field cron. When set, registers a recurring schedule (returns schedule_id) instead of a one-off task; one approval card is created per slot. Approval type only.",
+    ),
+  timezone: z
+    .string()
+    .optional()
+    .describe("IANA timezone for schedule_cron (e.g. America/New_York). Defaults to UTC."),
+  skip_if_prev_open: z
+    .boolean()
+    .optional()
+    .describe("For a schedule: skip a slot if the previous card is still unresolved."),
   idempotency_key: z
     .string()
     .optional()
@@ -82,14 +96,50 @@ export const createTaskTool = defineTool({
     "Creates a human-review task on your loophand board and returns its task_id. The card appears live for the human; pair it with await_task to block until they resolve it.",
   schema,
   responseShape: mcpEnvelope({
-    task_id: z.string(),
-    project_id: z.string(),
-    status: z.string(),
+    task_id: z.string().nullable(),
+    project_id: z.string().nullable(),
+    status: z.string().nullable(),
     reused: z.boolean(),
     item_count: z.number().nullable(),
+    // Set instead of the task fields when schedule_cron registered a schedule.
+    schedule_id: z.string().nullable(),
+    next_run_at: z.number().nullable(),
   }),
   execute: async (mcpCtx, input) => {
     requireTaskScope(mcpCtx, "write");
+
+    // schedule_cron registers a recurring schedule rather than a one-off task.
+    if (input.schedule_cron) {
+      const sched: { schedule_id: string; next_run_at: number } = await mcpCtx.ctx.runMutation(
+        internal.schedules.createScheduleForAgent,
+        {
+          userId: mcpCtx.userId,
+          tokenId: mcpCtx.tokenId,
+          project: input.project,
+          name: input.title,
+          cron: input.schedule_cron,
+          timezone: input.timezone,
+          skipIfPrevOpen: input.skip_if_prev_open,
+          taskTemplate: {
+            type: input.type,
+            title: input.title,
+            instructions: input.instructions,
+            acceptanceCriteria: input.acceptance_criteria,
+            tags: input.tags,
+          },
+        },
+      );
+      return mcpSuccess({
+        task_id: null,
+        project_id: null,
+        status: null,
+        reused: false,
+        item_count: null,
+        schedule_id: sched.schedule_id,
+        next_run_at: sched.next_run_at,
+      });
+    }
+
     const created: { task: AgentTaskView; reused: boolean } = await mcpCtx.ctx.runMutation(
       internal.tasks.createForAgent,
       {
@@ -121,6 +171,8 @@ export const createTaskTool = defineTool({
       status: task.status,
       reused: created.reused,
       item_count: task.item_count,
+      schedule_id: null,
+      next_run_at: null,
     });
   },
 });

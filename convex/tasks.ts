@@ -25,6 +25,9 @@ import { assertDocItemData } from "./lib/render";
 import { normalizeTags } from "./lib/tags";
 import { rateLimiter } from "./rateLimit";
 import { enforceLimit } from "./lib/rateLimitGuard";
+import { initialTaskState } from "./lib/deps";
+import { maybeNotifyOwner } from "./lib/notifyOwner";
+import { resolveDeps, unblockDependents, failDependents } from "./deps";
 
 const statusValidator = v.union(...TASK_STATUSES.map((s) => v.literal(s)));
 const outcomeValidator = v.union(...TASK_OUTCOMES.map((o) => v.literal(o)));
@@ -103,6 +106,9 @@ const taskViewValidator = v.object({
   revision: v.number(),
   createdByTokenId: v.union(v.id("apiTokens"), v.null()),
   resumedByTokenId: v.union(v.id("apiTokens"), v.null()),
+  // Number of tasks this one waits on — drives the blocked lane's lock badge.
+  // Counted only for blocked tasks (0 otherwise) to keep the board query cheap.
+  depCount: v.number(),
   createdAt: v.number(),
   updatedAt: v.number(),
   expiresAt: v.union(v.number(), v.null()),
@@ -162,10 +168,21 @@ async function resolveScreenshotUrl(
 // The board view plus the fields that need a lookup: the tool payload and its
 // resolved screenshot URL.
 async function enrichTaskView(ctx: QueryCtx | MutationCtx, task: Doc<"tasks">) {
+  // Only blocked cards surface a dep count; skip the lookup otherwise.
+  const depCount =
+    task.status === "blocked"
+      ? (
+          await ctx.db
+            .query("taskDeps")
+            .withIndex("by_task", (q) => q.eq("taskId", task._id))
+            .collect()
+        ).length
+      : 0;
   return {
     ...toTaskView(task),
     toolPayload: task.toolPayload ?? null,
     screenshotUrl: await resolveScreenshotUrl(ctx, task.toolPayload),
+    depCount,
   };
 }
 
@@ -217,28 +234,6 @@ async function resolveProjectRef(
   });
 }
 
-// One push per user per window, so a burst of task creates doesn't fire a
-// notification for each. `lastNotifiedAt` on the user is the throttle clock.
-const PUSH_THROTTLE_MS = 15_000;
-
-async function maybeNotifyOwner(
-  ctx: MutationCtx,
-  userId: Id<"users">,
-  taskId: Id<"tasks">,
-  now: number,
-): Promise<void> {
-  // Skip the user-row write + scheduled action entirely when push isn't
-  // configured (e.g. a deployment without VAPID) — keeps create off that path.
-  if (!process.env.VAPID_PUBLIC_KEY) return;
-  const user = await ctx.db.get(userId);
-  if (user && now - (user.lastNotifiedAt ?? 0) < PUSH_THROTTLE_MS) return;
-  // The read-modify-write on this row makes concurrent creates a Convex OCC
-  // write-write conflict: one retries against the fresh stamp, so exactly one
-  // push fires per window even under a race.
-  await ctx.db.patch(userId, { lastNotifiedAt: now });
-  await ctx.scheduler.runAfter(0, internal.notify.push, { taskId });
-}
-
 // ── Agent-facing (trusted userId from token auth, used by MCP tools) ─────────
 
 export const createForAgent = internalMutation({
@@ -257,6 +252,10 @@ export const createForAgent = internalMutation({
     items: v.optional(
       v.array(v.object({ title: v.optional(v.string()), data: v.optional(v.any()) })),
     ),
+    // DAG: ids of owned, same-project tasks this one waits on. The task starts
+    // `blocked` until every dep is approved (and notBefore passes).
+    dependsOn: v.optional(v.array(v.string())),
+    notBefore: v.optional(v.number()),
     idempotencyKey: v.optional(v.string()),
     ttlSeconds: v.optional(v.number()),
   },
@@ -340,6 +339,12 @@ export const createForAgent = internalMutation({
     const expiresAt =
       args.ttlSeconds && args.ttlSeconds > 0 ? now + args.ttlSeconds * 1000 : undefined;
 
+    // Resolve + validate deps, then derive the birth state: born `done`/
+    // dependency_failed if any dep already failed, `blocked` while a dep is
+    // unapproved or notBefore is future, else `open`.
+    const deps = await resolveDeps(ctx, args.userId, projectId, args.dependsOn);
+    const initial = initialTaskState(deps, args.notBefore, now);
+
     const taskId = await ctx.db.insert("tasks", {
       userId: args.userId,
       projectId,
@@ -349,10 +354,12 @@ export const createForAgent = internalMutation({
       instructions: args.instructions,
       acceptanceCriteria: args.acceptanceCriteria,
       tags: normalizeTags(args.tags),
-      status: "open",
+      status: initial.status,
+      outcome: "outcome" in initial ? initial.outcome : undefined,
       toolPayload,
       itemCount: items ? items.length : undefined,
       itemsDone: items ? 0 : undefined,
+      notBefore: args.notBefore,
       resultVersion: 0,
       revision: 0,
       idempotencyKey: args.idempotencyKey,
@@ -360,6 +367,10 @@ export const createForAgent = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    for (const dep of deps) {
+      await ctx.db.insert("taskDeps", { taskId, dependsOnTaskId: dep._id, createdAt: now });
+    }
 
     if (items) {
       for (const [order, item] of items.entries()) {
@@ -384,7 +395,14 @@ export const createForAgent = internalMutation({
       createdAt: now,
     });
     if (expiresAt) await ctx.scheduler.runAt(expiresAt, internal.tasks.expire, { taskId });
-    await maybeNotifyOwner(ctx, args.userId, taskId, now);
+    // A future notBefore needs a timer to release the task even if its deps are
+    // already satisfied; dep-driven release goes through unblockDependents.
+    if (initial.status === "blocked" && args.notBefore && args.notBefore > now) {
+      await ctx.scheduler.runAt(args.notBefore, internal.deps.unblockCheck, { taskId });
+    }
+    // Only an immediately-actionable (open) task pings the human; blocked and
+    // born-failed tasks don't.
+    if (initial.status === "open") await maybeNotifyOwner(ctx, args.userId, taskId, now);
 
     const task = await ctx.db.get(taskId);
     if (!task) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
@@ -461,6 +479,7 @@ export const cancelForAgent = internalMutation({
       actorTokenId: args.tokenId,
       createdAt: now,
     });
+    await failDependents(ctx, taskId, now);
     const updated = await ctx.db.get(taskId);
     if (!updated) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
     return toAgentView(updated);
@@ -625,6 +644,10 @@ export const resolve = mutation({
       revision: task.revision + 1,
       createdAt: now,
     });
+    // Propagate to the DAG: an approval may release blocked dependents; a cancel
+    // is a terminal failure that fails the blocked subtree below it.
+    if (args.action === "approve") await unblockDependents(ctx, args.taskId);
+    else if (args.action === "cancel") await failDependents(ctx, args.taskId, now);
     const updated = await ctx.db.get(args.taskId);
     if (!updated) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
     return enrichTaskView(ctx, updated);
@@ -690,6 +713,7 @@ export const expire = internalMutation({
       updatedAt: now,
     });
     await ctx.db.insert("taskActivity", { taskId: args.taskId, type: "expired", createdAt: now });
+    await failDependents(ctx, args.taskId, now);
     return null;
   },
 });

@@ -1,3 +1,4 @@
+import { LockSimpleIcon } from "@phosphor-icons/react";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { outcomeBadge, relativeAge } from "./format";
@@ -32,6 +33,14 @@ export function TaskCard(props: Props) {
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <Badge tone="info">{task.type}</Badge>
+        {task.status === "blocked" ? (
+          <Badge tone="neutral">
+            <LockSimpleIcon className="h-3 w-3" />
+            {task.depCount > 0
+              ? `${task.depCount} ${task.depCount === 1 ? "dep" : "deps"}`
+              : "scheduled"}
+          </Badge>
+        ) : null}
         {badge ? <Badge tone={badge.tone}>{`${badge.icon} ${badge.label}`}</Badge> : null}
         {task.tags.map((tag) => (
           <Badge key={tag} tone="neutral">

@@ -2,6 +2,7 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -287,5 +288,153 @@ describe("tasks.close", () => {
     expect(closeAudit).toBeTruthy();
     expect(closeAudit?.fromStatus).toBe("resumed");
     expect(closeAudit?.toStatus).toBe("done");
+  });
+});
+
+describe("tasks dependencies (create)", () => {
+  async function createDep(
+    t: ReturnType<typeof convexTest>,
+    ids: { userId: Id<"users">; tokenId: Id<"apiTokens"> },
+  ) {
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId: ids.userId,
+      tokenId: ids.tokenId,
+      type: "approval",
+      title: "dep",
+      instructions: "dep",
+    });
+    return task.task_id;
+  }
+
+  test("a task depending on an open task is born blocked, with an edge written", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const depId = await createDep(t, ids);
+
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId: ids.userId,
+      tokenId: ids.tokenId,
+      type: "approval",
+      title: "child",
+      instructions: "child",
+      dependsOn: [depId],
+    });
+    expect(task.status).toBe("blocked");
+
+    const edges = await t.run((ctx) =>
+      ctx.db
+        .query("taskDeps")
+        .withIndex("by_task", (q) => q.eq("taskId", task.task_id))
+        .collect(),
+    );
+    expect(edges.map((e) => e.dependsOnTaskId)).toEqual([depId]);
+  });
+
+  test("a task whose deps are all approved is born open", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    const depId = await createDep(t, ids);
+    await asOwner.mutation(api.tasks.resolve, { taskId: depId, action: "approve", revision: 0 });
+
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId: ids.userId,
+      tokenId: ids.tokenId,
+      type: "approval",
+      title: "child",
+      instructions: "child",
+      dependsOn: [depId],
+    });
+    expect(task.status).toBe("open");
+  });
+
+  test("a task depending on a failed task is born dependency_failed", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const depId = await createDep(t, ids);
+    await t.mutation(internal.tasks.cancelForAgent, {
+      userId: ids.userId,
+      tokenId: ids.tokenId,
+      taskId: depId,
+    });
+
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId: ids.userId,
+      tokenId: ids.tokenId,
+      type: "approval",
+      title: "child",
+      instructions: "child",
+      dependsOn: [depId],
+    });
+    expect(task.status).toBe("done");
+    expect(task.outcome).toBe("dependency_failed");
+  });
+
+  test("a future not_before makes a task blocked", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId: ids.userId,
+      tokenId: ids.tokenId,
+      type: "approval",
+      title: "later",
+      instructions: "later",
+      notBefore: Date.now() + 60_000,
+    });
+    expect(task.status).toBe("blocked");
+  });
+
+  test("a cross-project dependency is rejected", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const otherProject = await t.run((ctx) =>
+      ctx.db.insert("projects", {
+        name: "Other",
+        userId: ids.userId,
+        isDefault: false,
+        createdAt: Date.now(),
+      }),
+    );
+    const depElsewhere = await t.run((ctx) =>
+      ctx.db.insert("tasks", {
+        userId: ids.userId,
+        projectId: otherProject,
+        type: "approval",
+        title: "elsewhere",
+        instructions: "elsewhere",
+        tags: [],
+        status: "open",
+        resultVersion: 0,
+        revision: 0,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    );
+
+    await expect(
+      t.mutation(internal.tasks.createForAgent, {
+        userId: ids.userId,
+        tokenId: ids.tokenId,
+        type: "approval",
+        title: "child",
+        instructions: "child",
+        dependsOn: [depElsewhere],
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("an unknown dependency id is rejected", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    await expect(
+      t.mutation(internal.tasks.createForAgent, {
+        userId: ids.userId,
+        tokenId: ids.tokenId,
+        type: "approval",
+        title: "child",
+        instructions: "child",
+        dependsOn: ["not-a-real-id"],
+      }),
+    ).rejects.toThrow();
   });
 });

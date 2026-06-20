@@ -194,6 +194,9 @@ export default defineSchema({
     // reaches `itemCount` the rollup wakes await_task (ADR-0002).
     itemCount: v.optional(v.number()),
     itemsDone: v.optional(v.number()),
+    // Earliest time a blocked task may open (Phase 5 `not_before`). A blocked
+    // task releases only once every dep is approved AND notBefore has passed.
+    notBefore: v.optional(v.number()),
     expiresAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),

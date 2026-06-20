@@ -25,6 +25,10 @@ import { assertDocItemData } from "./lib/render";
 import { normalizeTags } from "./lib/tags";
 import { rateLimiter } from "./rateLimit";
 import { enforceLimit } from "./lib/rateLimitGuard";
+import { initialTaskState, canUnblock } from "./lib/deps";
+
+// Cap on a task's declared dependencies (full quotas land in Phase 6).
+const MAX_DEPS = 50;
 
 const statusValidator = v.union(...TASK_STATUSES.map((s) => v.literal(s)));
 const outcomeValidator = v.union(...TASK_OUTCOMES.map((o) => v.literal(o)));
@@ -239,6 +243,65 @@ async function maybeNotifyOwner(
   await ctx.scheduler.runAfter(0, internal.notify.push, { taskId });
 }
 
+// ── Dependencies (Phase 5 DAG) ───────────────────────────────────────────────
+
+// Resolve and validate a task's declared dependencies. Each must be an owned
+// task in the SAME project — a cross-project (or cross-user) reference is an
+// isolation leak, so this is a security check, not just UX. Not-owned/unknown
+// ids report NOT_FOUND (no existence leak); a wrong-project dep is a clear
+// validation error (same user, nothing to hide). Cycles can't form: a new task
+// has no inbound edges, so its deps only ever point at older tasks.
+async function resolveDeps(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  projectId: Id<"projects">,
+  rawIds: string[] | undefined,
+): Promise<Doc<"tasks">[]> {
+  if (!rawIds || rawIds.length === 0) return [];
+  if (rawIds.length > MAX_DEPS) {
+    throw new ConvexError({
+      code: "VALIDATION_ERROR",
+      message: `A task can declare at most ${MAX_DEPS} dependencies.`,
+    });
+  }
+  const seen = new Set<string>();
+  const deps: Doc<"tasks">[] = [];
+  for (const raw of rawIds) {
+    const id = ctx.db.normalizeId("tasks", raw);
+    if (!id) throw new ConvexError({ code: "NOT_FOUND", message: `Dependency "${raw}" not found.` });
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const dep = await ctx.db.get(id);
+    if (!dep || dep.userId !== userId) {
+      throw new ConvexError({ code: "NOT_FOUND", message: `Dependency "${raw}" not found.` });
+    }
+    if (dep.projectId !== projectId) {
+      throw new ConvexError({
+        code: "VALIDATION_ERROR",
+        message: "Dependencies must be in the same project as the task.",
+      });
+    }
+    deps.push(dep);
+  }
+  return deps;
+}
+
+// Freshly read a task's dependency tasks from its edges — never a counter. The
+// unblock decision re-reads these in-transaction so two deps finishing at once
+// can't wedge a dependent (the crux race).
+async function readDeps(ctx: QueryCtx | MutationCtx, taskId: Id<"tasks">): Promise<Doc<"tasks">[]> {
+  const edges = await ctx.db
+    .query("taskDeps")
+    .withIndex("by_task", (q) => q.eq("taskId", taskId))
+    .collect();
+  const deps: Doc<"tasks">[] = [];
+  for (const edge of edges) {
+    const dep = await ctx.db.get(edge.dependsOnTaskId);
+    if (dep) deps.push(dep);
+  }
+  return deps;
+}
+
 // ── Agent-facing (trusted userId from token auth, used by MCP tools) ─────────
 
 export const createForAgent = internalMutation({
@@ -257,6 +320,10 @@ export const createForAgent = internalMutation({
     items: v.optional(
       v.array(v.object({ title: v.optional(v.string()), data: v.optional(v.any()) })),
     ),
+    // DAG: ids of owned, same-project tasks this one waits on. The task starts
+    // `blocked` until every dep is approved (and notBefore passes).
+    dependsOn: v.optional(v.array(v.string())),
+    notBefore: v.optional(v.number()),
     idempotencyKey: v.optional(v.string()),
     ttlSeconds: v.optional(v.number()),
   },
@@ -340,6 +407,12 @@ export const createForAgent = internalMutation({
     const expiresAt =
       args.ttlSeconds && args.ttlSeconds > 0 ? now + args.ttlSeconds * 1000 : undefined;
 
+    // Resolve + validate deps, then derive the birth state: born `done`/
+    // dependency_failed if any dep already failed, `blocked` while a dep is
+    // unapproved or notBefore is future, else `open`.
+    const deps = await resolveDeps(ctx, args.userId, projectId, args.dependsOn);
+    const initial = initialTaskState(deps, args.notBefore, now);
+
     const taskId = await ctx.db.insert("tasks", {
       userId: args.userId,
       projectId,
@@ -349,10 +422,12 @@ export const createForAgent = internalMutation({
       instructions: args.instructions,
       acceptanceCriteria: args.acceptanceCriteria,
       tags: normalizeTags(args.tags),
-      status: "open",
+      status: initial.status,
+      outcome: "outcome" in initial ? initial.outcome : undefined,
       toolPayload,
       itemCount: items ? items.length : undefined,
       itemsDone: items ? 0 : undefined,
+      notBefore: args.notBefore,
       resultVersion: 0,
       revision: 0,
       idempotencyKey: args.idempotencyKey,
@@ -360,6 +435,10 @@ export const createForAgent = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    for (const dep of deps) {
+      await ctx.db.insert("taskDeps", { taskId, dependsOnTaskId: dep._id, createdAt: now });
+    }
 
     if (items) {
       for (const [order, item] of items.entries()) {
@@ -384,7 +463,14 @@ export const createForAgent = internalMutation({
       createdAt: now,
     });
     if (expiresAt) await ctx.scheduler.runAt(expiresAt, internal.tasks.expire, { taskId });
-    await maybeNotifyOwner(ctx, args.userId, taskId, now);
+    // A future notBefore needs a timer to release the task even if its deps are
+    // already satisfied; dep-driven release goes through unblockDependents.
+    if (initial.status === "blocked" && args.notBefore && args.notBefore > now) {
+      await ctx.scheduler.runAt(args.notBefore, internal.tasks.unblockCheck, { taskId });
+    }
+    // Only an immediately-actionable (open) task pings the human; blocked and
+    // born-failed tasks don't.
+    if (initial.status === "open") await maybeNotifyOwner(ctx, args.userId, taskId, now);
 
     const task = await ctx.db.get(taskId);
     if (!task) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
@@ -690,6 +776,25 @@ export const expire = internalMutation({
       updatedAt: now,
     });
     await ctx.db.insert("taskActivity", { taskId: args.taskId, type: "expired", createdAt: now });
+    return null;
+  },
+});
+
+// Release a blocked task once every dep is approved and notBefore has passed.
+// Fired by the notBefore timer and by unblockDependents; both re-read deps fresh
+// (canUnblock), so a concurrent dep completion can't wedge the task. Idempotent:
+// a no-longer-blocked task is left untouched.
+export const unblockCheck = internalMutation({
+  args: { taskId: v.id("tasks") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    if (!task || task.status !== "blocked") return null;
+    const deps = await readDeps(ctx, args.taskId);
+    const now = Date.now();
+    if (!canUnblock(deps, task.notBefore, now)) return null;
+    await ctx.db.patch(args.taskId, { status: "open", updatedAt: now });
+    await maybeNotifyOwner(ctx, task.userId, args.taskId, now);
     return null;
   },
 });

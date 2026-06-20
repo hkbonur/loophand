@@ -86,6 +86,28 @@ export const taskNotifyTarget = internalQuery({
   },
 });
 
+// Email-notification target for a task: the owner's email + the card's title /
+// type / project. Null when the task is gone or the owner has no email on file.
+export const taskEmailTarget = internalQuery({
+  args: { taskId: v.id("tasks") },
+  returns: v.union(
+    v.object({
+      email: v.string(),
+      title: v.string(),
+      type: v.string(),
+      projectId: v.id("projects"),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const task = await ctx.db.get(args.taskId);
+    if (!task) return null;
+    const user = await ctx.db.get(task.userId);
+    if (!user?.email) return null;
+    return { email: user.email, title: task.title, type: task.type, projectId: task.projectId };
+  },
+});
+
 // The VAPID public key the browser needs to subscribe. Public by design (it's
 // the server's identity, not a secret); null when push isn't configured.
 export const publicKey = query({

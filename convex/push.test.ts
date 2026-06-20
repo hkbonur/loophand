@@ -126,3 +126,47 @@ describe("owner notification throttle", () => {
     expect(secondStamp).toBe(firstStamp); // unchanged → no second notification
   });
 });
+
+describe("push.taskEmailTarget", () => {
+  test("returns the owner email + task title/type", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId } = await setupOwnerWithToken(t, "owner@example.com");
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId,
+      tokenId,
+      type: "approval",
+      title: "Ship it",
+      instructions: "Review",
+    });
+
+    const target = await t.query(internal.push.taskEmailTarget, { taskId: task.task_id });
+    expect(target).toMatchObject({ email: "owner@example.com", title: "Ship it", type: "approval" });
+  });
+
+  test("returns null when the owner has no email", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await t.run(async (ctx) => {
+      const userId = await ctx.db.insert("users", { createdAt: Date.now() });
+      const tokenId = await ctx.db.insert("apiTokens", {
+        userId,
+        tokenType: "api_key" as const,
+        name: "t",
+        tokenHash: "h-noemail",
+        tokenPrefix: "lh",
+        scope: "tasks:write",
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 1_000_000_000,
+      });
+      return { userId, tokenId };
+    });
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId: ids.userId,
+      tokenId: ids.tokenId,
+      type: "approval",
+      title: "T",
+      instructions: "i",
+    });
+
+    expect(await t.query(internal.push.taskEmailTarget, { taskId: task.task_id })).toBeNull();
+  });
+});

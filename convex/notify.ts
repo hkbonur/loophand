@@ -5,6 +5,31 @@ import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { buildPushPayload, isDeadPushError } from "./lib/pushPayload";
+import { sendEmail } from "./lib/email";
+import { buildTaskEmail } from "./lib/taskEmail";
+
+// Emails the task owner that a card needs review. Best-effort: no-op when Resend
+// isn't configured (sendEmail handles that) or the owner has no email. Throttled
+// upstream by maybeNotifyOwner (one notify per user per window).
+export const email = internalAction({
+  args: { taskId: v.id("tasks") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (!process.env.RESEND_API_KEY) return null;
+    const target: {
+      email: string;
+      title: string;
+      type: string;
+      projectId: Id<"projects">;
+    } | null = await ctx.runQuery(internal.push.taskEmailTarget, { taskId: args.taskId });
+    if (!target) return null;
+    const siteUrl = process.env.SITE_URL;
+    const url = siteUrl ? `${siteUrl}/?task=${args.taskId}` : null;
+    const { subject, html } = buildTaskEmail({ title: target.title, type: target.type, url });
+    await sendEmail({ to: target.email, subject, html, meta: { taskId: args.taskId } });
+    return null;
+  },
+});
 
 // Sends a Web Push to every device the task owner has subscribed. Runs in Node
 // (web-push needs Node crypto). Best-effort: no-op when VAPID isn't configured,

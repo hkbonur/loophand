@@ -14,12 +14,15 @@ import { MultiItemReview } from "./item-rail/MultiItemReview";
 import { SectionLabel } from "./SectionLabel";
 import { staleNotice } from "./staleNotice";
 import { AgentChip } from "./AgentChip";
+import { DepMiniView } from "./DepMiniView";
 import { useAgents } from "./useAgents";
 import type { TaskView } from "./types";
 
 interface Props {
   taskId: Id<"tasks">;
   onClose: () => void;
+  // Navigate the dialog to a dependency neighbour.
+  onOpenTask?: (taskId: Id<"tasks">) => void;
 }
 
 export function CardDialog(props: Props) {
@@ -54,12 +57,12 @@ export function CardDialog(props: Props) {
           {isWide ? (
             // Wide surfaces stack details on top, then the full-width surface.
             <div className="flex flex-col gap-6 p-6">
-              <TaskDetails task={task} />
+              <TaskDetails task={task} onOpenTask={props.onOpenTask} />
               <TaskPanel task={task} onResolved={props.onClose} />
             </div>
           ) : (
             <div className="grid gap-6 p-6 sm:grid-cols-[1.2fr_1fr]">
-              <TaskDetails task={task} />
+              <TaskDetails task={task} onOpenTask={props.onOpenTask} />
               <div className="border-t border-border pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
                 <TaskPanel task={task} onResolved={props.onClose} />
               </div>
@@ -79,10 +82,11 @@ function StaleBanner(props: { message: string }) {
   );
 }
 
-function TaskDetails(props: { task: TaskView }) {
+function TaskDetails(props: { task: TaskView; onOpenTask?: (taskId: Id<"tasks">) => void }) {
   const task = props.task;
   const agents = useAgents();
   const setTags = useMutation(api.tasks.setTags);
+  const deps = useQuery(api.tasks.deps, { taskId: task._id });
   const now = Date.now();
   // undefined = no attribution recorded (hide the row); null = the token is gone
   // (show "Unknown agent").
@@ -123,6 +127,9 @@ function TaskDetails(props: { task: TaskView }) {
         <SectionLabel>Tags</SectionLabel>
         <TagEditor tags={task.tags} onChange={onTagsChange} />
       </div>
+      {deps ? (
+        <DepMiniView blockedBy={deps.blockedBy} blocks={deps.blocks} onOpen={props.onOpenTask} />
+      ) : null}
     </div>
   );
 }

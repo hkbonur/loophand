@@ -173,7 +173,11 @@ function BoardInner() {
       )}
 
       {selectedTaskId ? (
-        <CardDialog taskId={selectedTaskId} onClose={() => setSelectedTaskId(null)} />
+        <CardDialog
+          taskId={selectedTaskId}
+          onClose={() => setSelectedTaskId(null)}
+          onOpenTask={setSelectedTaskId}
+        />
       ) : null}
     </main>
   );

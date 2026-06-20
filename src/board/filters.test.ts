@@ -4,7 +4,6 @@ import type { TaskView } from "./types";
 
 function task(partial: Partial<TaskView>): TaskView {
   return {
-    tags: [],
     type: "approval",
     createdByTokenId: null,
     ...partial,
@@ -12,18 +11,14 @@ function task(partial: Partial<TaskView>): TaskView {
 }
 
 const tasks: TaskView[] = [
-  task({ type: "approval", tags: ["docs"], createdByTokenId: "agent-a" as TaskView["createdByTokenId"] }),
-  task({ type: "visual_review", tags: ["feature"], createdByTokenId: "agent-b" as TaskView["createdByTokenId"] }),
-  task({ type: "approval", tags: ["docs", "feature"], createdByTokenId: "agent-b" as TaskView["createdByTokenId"] }),
+  task({ type: "approval", createdByTokenId: "agent-a" as TaskView["createdByTokenId"] }),
+  task({ type: "visual_review", createdByTokenId: "agent-b" as TaskView["createdByTokenId"] }),
+  task({ type: "approval", createdByTokenId: "agent-b" as TaskView["createdByTokenId"] }),
 ];
 
 describe("filterTasks", () => {
   test("returns everything for the empty filter", () => {
     expect(filterTasks(tasks, EMPTY_FILTER)).toHaveLength(3);
-  });
-
-  test("filters by tag (membership)", () => {
-    expect(filterTasks(tasks, { ...EMPTY_FILTER, tag: "feature" })).toHaveLength(2);
   });
 
   test("filters by type", () => {
@@ -40,7 +35,6 @@ describe("filterTasks", () => {
 
   test("combines dimensions (AND)", () => {
     const filter: BoardFilter = {
-      tag: "docs",
       type: "approval",
       agentTokenId: "agent-b" as TaskView["createdByTokenId"],
     };
@@ -51,6 +45,6 @@ describe("filterTasks", () => {
 describe("isFilterActive", () => {
   test("false for the empty filter, true once any dimension is set", () => {
     expect(isFilterActive(EMPTY_FILTER)).toBe(false);
-    expect(isFilterActive({ ...EMPTY_FILTER, tag: "docs" })).toBe(true);
+    expect(isFilterActive({ ...EMPTY_FILTER, type: "approval" })).toBe(true);
   });
 });

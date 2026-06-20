@@ -48,11 +48,6 @@ export function TaskCard(props: Props) {
           </Badge>
         ) : null}
         {badge ? <Badge tone={badge.tone}>{`${badge.icon} ${badge.label}`}</Badge> : null}
-        {task.tags.map((tag) => (
-          <Badge key={tag} tone="neutral">
-            {tag}
-          </Badge>
-        ))}
       </div>
       <div className="mt-2 flex items-center justify-between gap-2">
         <p className="shrink-0 text-xs tabular-nums text-muted-foreground">

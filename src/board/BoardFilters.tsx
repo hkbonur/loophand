@@ -8,7 +8,6 @@ export interface AgentOption {
 }
 
 interface Props {
-  tags: string[];
   agents: AgentOption[];
   types: string[];
   value: BoardFilter;
@@ -58,20 +57,13 @@ function FilterSelect(props: {
 
 const asOption = (value: string): Option => ({ value, label: value });
 
-// Board toolbar filter: tag / agent / type. Status is the column axis, so it's
-// not offered here.
+// Board toolbar filter: agent / type. Status is the column axis, so it's not
+// offered here.
 export function BoardFilters(props: Props) {
   const value = props.value;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <FilterSelect
-        label="Filter by tag"
-        placeholder="All tags"
-        value={value.tag ?? ""}
-        options={props.tags.map(asOption)}
-        onChange={(tag) => props.onChange({ ...value, tag: tag || null })}
-      />
       <FilterSelect
         label="Filter by agent"
         placeholder="All agents"

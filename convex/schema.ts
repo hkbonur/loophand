@@ -178,7 +178,6 @@ export default defineSchema({
     title: v.string(),
     instructions: v.string(),
     acceptanceCriteria: v.optional(v.string()),
-    tags: v.array(v.string()),
     status: taskStatus,
     // Badge — null is represented by omitting the field.
     outcome: v.optional(taskOutcome),

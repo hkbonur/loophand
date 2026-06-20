@@ -20,10 +20,6 @@ const schema = z.object({
     .string()
     .optional()
     .describe("Optional bar the human checks the work against."),
-  tags: z
-    .array(z.string())
-    .optional()
-    .describe("Labels for grouping/filtering within the project."),
   tool_payload: z
     .object({
       screenshot_file_id: z
@@ -101,7 +97,6 @@ export const createTaskTool = defineTool({
         title: input.title,
         instructions: input.instructions,
         acceptanceCriteria: input.acceptance_criteria,
-        tags: input.tags,
         toolPayload: input.tool_payload
           ? {
               screenshotFileId: input.tool_payload.screenshot_file_id,

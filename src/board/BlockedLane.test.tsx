@@ -15,7 +15,6 @@ function blocked(id: string, title: string, depCount: number): TaskView {
     title,
     type: "approval",
     status: "blocked",
-    tags: [],
     outcome: null,
     depCount,
     createdByTokenId: null,

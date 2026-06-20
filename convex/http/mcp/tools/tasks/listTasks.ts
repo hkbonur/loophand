@@ -12,14 +12,13 @@ const schema = z.object({
     .optional()
     .describe("Limit to a project (id or name). Omit to span all your projects."),
   status: z.enum(TASK_STATUSES).optional().describe("Filter by kanban column."),
-  tags: z.array(z.string()).optional().describe("Only tasks carrying all of these tags."),
   mine: z.boolean().optional().describe("Only tasks created by this token (agent recovery)."),
 });
 
 export const listTasksTool = defineTool({
   name: "list_tasks",
   description:
-    "Lists your tasks, newest first, optionally filtered by project, status, tags, or this token. Returns a compact array for board recovery and polling.",
+    "Lists your tasks, newest first, optionally filtered by project, status, or this token. Returns a compact array for board recovery and polling.",
   schema,
   responseShape: mcpEnvelope({ tasks: z.array(z.unknown()), count: z.number() }),
   execute: async (mcpCtx, input) => {
@@ -28,7 +27,6 @@ export const listTasksTool = defineTool({
       userId: mcpCtx.userId,
       project: input.project,
       status: input.status,
-      tags: input.tags,
       tokenId: input.mine ? mcpCtx.tokenId : undefined,
     });
     return mcpSuccess({ tasks, count: tasks.length });

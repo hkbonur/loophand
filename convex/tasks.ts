@@ -22,7 +22,6 @@ import {
 } from "./schema";
 import { isTaskType, TASK_TYPES, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
 import { assertDocItemData } from "./lib/render";
-import { normalizeTags } from "./lib/tags";
 import {
   normalizeCommentBody,
   latestGuidance,
@@ -113,7 +112,6 @@ const taskViewValidator = v.object({
   title: v.string(),
   instructions: v.string(),
   acceptanceCriteria: v.union(v.string(), v.null()),
-  tags: v.array(v.string()),
   status: statusValidator,
   outcome: v.union(outcomeValidator, v.null()),
   result: v.any(),
@@ -160,7 +158,6 @@ function toTaskView(task: Doc<"tasks">) {
     title: task.title,
     instructions: task.instructions,
     acceptanceCriteria: task.acceptanceCriteria ?? null,
-    tags: task.tags,
     status: task.status,
     outcome: task.outcome ?? null,
     result: task.result ?? null,
@@ -267,7 +264,6 @@ export const createForAgent = internalMutation({
     title: v.string(),
     instructions: v.string(),
     acceptanceCriteria: v.optional(v.string()),
-    tags: v.optional(v.array(v.string())),
     toolPayload: v.optional(toolPayloadInputValidator),
     // Multi-item (opt-in): each entry becomes a rail item the human reviews in
     // place. `data` is the per-item surface payload (e.g. a doc render spec).
@@ -383,7 +379,6 @@ export const createForAgent = internalMutation({
       title: args.title,
       instructions: args.instructions,
       acceptanceCriteria: args.acceptanceCriteria,
-      tags: normalizeTags(args.tags),
       status: initial.status,
       outcome: "outcome" in initial ? initial.outcome : undefined,
       toolPayload,
@@ -537,7 +532,6 @@ export const listForAgent = internalQuery({
     userId: v.id("users"),
     project: v.optional(v.string()),
     status: v.optional(statusValidator),
-    tags: v.optional(v.array(v.string())),
     tokenId: v.optional(v.id("apiTokens")),
   },
   returns: v.array(agentViewValidator),
@@ -558,11 +552,9 @@ export const listForAgent = internalQuery({
         .withIndex("by_user_status", (q) => q.eq("userId", args.userId))
         .collect();
     }
-    const tags = args.tags;
     return rows
       .filter((t) => (args.status ? t.status === args.status : true))
       .filter((t) => (args.tokenId ? t.createdByTokenId === args.tokenId : true))
-      .filter((t) => (tags && tags.length > 0 ? tags.every((tag) => t.tags.includes(tag)) : true))
       .sort((a, b) => b.createdAt - a.createdAt)
       .map(toAgentView);
   },
@@ -694,21 +686,6 @@ export const resolve = mutation({
     // is a terminal failure that fails the blocked subtree below it.
     if (args.action === "approve") await unblockDependents(ctx, args.taskId);
     else if (args.action === "cancel") await failDependents(ctx, args.taskId, now);
-    const updated = await ctx.db.get(args.taskId);
-    if (!updated) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
-    return enrichTaskView(ctx, updated);
-  },
-});
-
-// Human-set tags from the board. Normalized on write (trim/lowercase/dedupe/cap)
-// so agent- and human-supplied tags share one hygiene path.
-export const setTags = mutation({
-  args: { taskId: v.id("tasks"), tags: v.array(v.string()) },
-  returns: taskViewValidator,
-  handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
-    await assertOwnedTask(ctx, args.taskId, userId);
-    await ctx.db.patch(args.taskId, { tags: normalizeTags(args.tags), updatedAt: Date.now() });
     const updated = await ctx.db.get(args.taskId);
     if (!updated) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
     return enrichTaskView(ctx, updated);

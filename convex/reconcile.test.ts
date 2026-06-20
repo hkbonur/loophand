@@ -32,7 +32,6 @@ async function setupWithOutput(
       type: "doc_review",
       title: "T",
       instructions: "i",
-      tags: [],
       status: "open",
       resultVersion: 0,
       revision: 0,

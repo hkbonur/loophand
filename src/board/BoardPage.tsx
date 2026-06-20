@@ -79,7 +79,7 @@ function BoardInner() {
 
   const tasks = useQuery(api.tasks.list, activeProjectId ? { projectId: activeProjectId } : "skip");
   const agents = useAgents();
-  const { filter, setFilter, tagOptions, agentOptions, visibleTasks } = useBoardFilters(
+  const { filter, setFilter, agentOptions, visibleTasks } = useBoardFilters(
     tasks,
     agents,
     activeProjectId,
@@ -180,7 +180,6 @@ function BoardInner() {
           {tasks && tasks.length > 0 ? (
             <div className="mb-4">
               <BoardFilters
-                tags={tagOptions}
                 agents={agentOptions}
                 types={[...TASK_TYPES]}
                 value={filter}

@@ -15,14 +15,15 @@ export function pinNumbers(marks: Mark[]): Record<string, number> {
   return numbers;
 }
 
-// Strip the local editing id and stamp each pin with its derived label — the
-// backend contract carries geometry, viewport, severity, comment, and (for
-// pins) the number.
+// Strip the local editing id, tag the screenshot surface, and stamp each pin
+// with its derived label — the backend contract carries the surface, geometry,
+// viewport, severity, comment, and (for pins) the number.
 export function marksToAnnotations(marks: Mark[]): Annotation[] {
   const numbers = pinNumbers(marks);
-  return marks.map(({ id, ...annotation }) =>
-    annotation.shape === "pin" ? { ...annotation, label: numbers[id] } : annotation,
-  );
+  return marks.map(({ id, ...mark }) => {
+    const annotation: Annotation = { surface: "screenshot", ...mark };
+    return annotation.shape === "pin" ? { ...annotation, label: numbers[id] } : annotation;
+  });
 }
 
 export interface NewMark {

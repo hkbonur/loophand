@@ -90,6 +90,7 @@ describe("VisualReview", () => {
         revision: 0,
         annotations: [
           {
+            surface: "screenshot",
             shape: "box",
             points: [10, 10, 40, 40],
             viewport: "desktop",

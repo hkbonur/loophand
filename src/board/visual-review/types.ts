@@ -9,12 +9,27 @@ export type Viewport = "desktop" | "mobile";
 // The wire shape sent in `tasks.resolve({ annotations })`. `points` is
 // interpreted per shape: box [x,y,w,h], arrow [x1,y1,x2,y2],
 // pen [x1,y1,x2,y2,…] (a freehand sketch), pin [x,y]. All coordinates are in
-// the screenshot's natural pixel space, independent of display scale.
+// the surface's natural pixel space, independent of display scale.
+//
+// `surface` discriminates the locator: a screenshot mark sits on a viewport, a
+// doc mark on a page (convex/tasks.ts `annotationValidator`).
 export interface Annotation {
+  surface: "screenshot";
   shape: AnnotationShape;
   points: number[];
   label?: number;
   viewport: Viewport;
+  severity: Severity;
+  comment: string;
+}
+
+// A mark on a rendered document page (doc_review). Same geometry, page-located.
+export interface DocAnnotation {
+  surface: "doc";
+  shape: AnnotationShape;
+  points: number[];
+  label?: number;
+  page: number;
   severity: Severity;
   comment: string;
 }

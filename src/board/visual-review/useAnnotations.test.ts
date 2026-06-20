@@ -36,9 +36,9 @@ describe("marksToAnnotations", () => {
       pin("m3", "mobile"),
     ];
     expect(marksToAnnotations(marks)).toEqual([
-      { shape: "box", points: [1, 2, 3, 4], viewport: "desktop", severity: "blocker", comment: "x" },
-      { shape: "pin", points: [0, 0], viewport: "desktop", severity: "blocker", comment: "", label: 1 },
-      { shape: "pin", points: [0, 0], viewport: "mobile", severity: "blocker", comment: "", label: 1 },
+      { surface: "screenshot", shape: "box", points: [1, 2, 3, 4], viewport: "desktop", severity: "blocker", comment: "x" },
+      { surface: "screenshot", shape: "pin", points: [0, 0], viewport: "desktop", severity: "blocker", comment: "", label: 1 },
+      { surface: "screenshot", shape: "pin", points: [0, 0], viewport: "mobile", severity: "blocker", comment: "", label: 1 },
     ]);
   });
 });

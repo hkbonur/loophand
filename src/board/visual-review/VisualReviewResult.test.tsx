@@ -22,8 +22,8 @@ describe("VisualReviewResult", () => {
     decision: "changes_requested",
     comment: "overall: tighten spacing",
     annotations: [
-      { shape: "box", points: [0, 0, 10, 10], viewport: "desktop", severity: "blocker", comment: "header overlaps" },
-      { shape: "pin", points: [5, 5], label: 1, viewport: "mobile", severity: "nit", comment: "icon a touch small" },
+      { surface: "screenshot", shape: "box", points: [0, 0, 10, 10], viewport: "desktop", severity: "blocker", comment: "header overlaps" },
+      { surface: "screenshot", shape: "pin", points: [5, 5], label: 1, viewport: "mobile", severity: "nit", comment: "icon a touch small" },
     ],
   };
 

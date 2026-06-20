@@ -53,14 +53,12 @@ async function itemIdByOrder(
   order: number,
 ): Promise<Id<"taskItems">> {
   const id = await t.run(async (ctx) => {
-    const item = await ctx.db
-      .query("taskItems")
-      .withIndex("by_task_order", (q) => q.eq("taskId", taskId).eq("order", order))
-      .first();
-    return item?._id ?? null;
+    const items = await ctx.db.query("taskItems").collect();
+    const match = items.find((i) => i.taskId === taskId && i.order === order);
+    return match?._id ?? null;
   });
   if (!id) throw new Error(`no item at order ${order}`);
-  return id;
+  return id as Id<"taskItems">;
 }
 
 describe("multi-item create", () => {

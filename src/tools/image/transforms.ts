@@ -41,6 +41,26 @@ export function extensionFor(type: OutputType): string {
   return EXT[type];
 }
 
+// Short label for an op, shown as a pill in the edit pipeline.
+export function opLabel(op: ImageOp): string {
+  switch (op.kind) {
+    case "rotate":
+      return op.deg === 90 ? "Rotate R" : op.deg === 270 ? "Rotate L" : "Rotate 180";
+    case "flip":
+      return op.axis === "h" ? "Flip H" : "Flip V";
+    case "grayscale":
+      return "Grayscale";
+    case "resize":
+      return `Resize ${op.width}`;
+  }
+}
+
+// The horizontal pipeline shown above the toolbar: the source, then one pill per
+// applied op, in order.
+export function pipelineSteps(ops: ImageOp[]): string[] {
+  return ["Original", ...ops.map(opLabel)];
+}
+
 // Draw `source` (at natural w×h) through one op into a fresh canvas. Browser-only
 // (needs a real 2D context); callers chain these over the working canvas.
 export function applyOp(

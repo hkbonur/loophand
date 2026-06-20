@@ -134,7 +134,7 @@ export function VisualReview(props: Props) {
         <div className="overflow-auto rounded-2xl border border-border bg-card">
           <React.Suspense fallback={<div className="p-8 text-center"><Spinner /></div>}>
             <AnnotationCanvas
-              imageUrl={task.screenshotUrl}
+              imageUrl={`${task.screenshotUrl}?cors=1`}
               displayWidth={DISPLAY_WIDTH[viewport]}
               viewport={viewport}
               marks={ann.marks}

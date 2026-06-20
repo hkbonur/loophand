@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { resizeDimensions, rotatedDimensions, extensionFor } from "./transforms";
+import {
+  resizeDimensions,
+  rotatedDimensions,
+  extensionFor,
+  opLabel,
+  pipelineSteps,
+} from "./transforms";
 
 describe("resizeDimensions", () => {
   it("preserves aspect ratio", () => {
@@ -24,5 +30,29 @@ describe("extensionFor", () => {
     expect(extensionFor("image/png")).toBe("png");
     expect(extensionFor("image/jpeg")).toBe("jpg");
     expect(extensionFor("image/webp")).toBe("webp");
+  });
+});
+
+describe("opLabel", () => {
+  it("names each op direction", () => {
+    expect(opLabel({ kind: "rotate", deg: 90 })).toBe("Rotate R");
+    expect(opLabel({ kind: "rotate", deg: 270 })).toBe("Rotate L");
+    expect(opLabel({ kind: "rotate", deg: 180 })).toBe("Rotate 180");
+    expect(opLabel({ kind: "flip", axis: "h" })).toBe("Flip H");
+    expect(opLabel({ kind: "flip", axis: "v" })).toBe("Flip V");
+    expect(opLabel({ kind: "grayscale" })).toBe("Grayscale");
+    expect(opLabel({ kind: "resize", width: 800 })).toBe("Resize 800");
+  });
+});
+
+describe("pipelineSteps", () => {
+  it("leads with Original, then one label per op", () => {
+    expect(pipelineSteps([])).toEqual(["Original"]);
+    expect(
+      pipelineSteps([
+        { kind: "rotate", deg: 90 },
+        { kind: "grayscale" },
+      ]),
+    ).toEqual(["Original", "Rotate R", "Grayscale"]);
   });
 });

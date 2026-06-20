@@ -28,7 +28,12 @@ interface Props {
 
 export function CardDialog(props: Props) {
   const task = useQuery(api.tasks.get, { taskId: props.taskId });
-  // Surfaces that need the full dialog width: the annotation canvas and the
+  // The image studio takes over the whole dialog (canvas-first dark surface that
+  // carries its own instructions, resolve, and comment dock) while it's the live
+  // working surface — i.e. an open, single-item image task.
+  const fullTakeover =
+    !!task && task.type === "image" && task.status === "open" && task.itemCount === null;
+  // Other surfaces that need the full dialog width: the annotation canvas and the
   // multi-item rail.
   const isWide =
     !!task && (task.type === "visual_review" || task.type === "image" || task.itemCount !== null);
@@ -48,6 +53,8 @@ export function CardDialog(props: Props) {
         </div>
       ) : task === null ? (
         <div className="p-8 text-sm text-muted-foreground">This task is no longer available.</div>
+      ) : fullTakeover ? (
+        <ImageStudio task={task} onResolved={props.onClose} onOpenTask={props.onOpenTask} />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
           {stale ? <StaleBanner message={stale} /> : null}
@@ -197,6 +204,5 @@ function TaskPanel(props: { task: TaskView; onResolved: () => void }) {
   }
   if (task.status !== "open") return <ResultPanel task={task} />;
   if (task.type === "visual_review") return <VisualReview task={task} onResolved={onResolved} />;
-  if (task.type === "image") return <ImageStudio task={task} onResolved={onResolved} />;
   return <ApprovalPanel task={task} onResolved={onResolved} />;
 }

@@ -21,15 +21,14 @@ const SELECT_CLASS =
 // Board toolbar filter: tag / agent / type. Empty option ("") clears that
 // dimension. Status is the column axis, so it's not offered here.
 export function BoardFilters(props: Props) {
-  const { value, onChange } = props;
-  const active = isFilterActive(value);
+  const value = props.value;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       <select
         aria-label="Filter by tag"
         value={value.tag ?? ""}
-        onChange={(event) => onChange({ ...value, tag: event.target.value || null })}
+        onChange={(event) => props.onChange({ ...value, tag: event.target.value || null })}
         className={SELECT_CLASS}
       >
         <option value="">All tags</option>
@@ -44,7 +43,10 @@ export function BoardFilters(props: Props) {
         aria-label="Filter by agent"
         value={value.agentTokenId ?? ""}
         onChange={(event) =>
-          onChange({ ...value, agentTokenId: (event.target.value || null) as BoardFilter["agentTokenId"] })
+          props.onChange({
+            ...value,
+            agentTokenId: (event.target.value || null) as BoardFilter["agentTokenId"],
+          })
         }
         className={SELECT_CLASS}
       >
@@ -59,7 +61,7 @@ export function BoardFilters(props: Props) {
       <select
         aria-label="Filter by type"
         value={value.type ?? ""}
-        onChange={(event) => onChange({ ...value, type: event.target.value || null })}
+        onChange={(event) => props.onChange({ ...value, type: event.target.value || null })}
         className={SELECT_CLASS}
       >
         <option value="">All types</option>
@@ -70,10 +72,10 @@ export function BoardFilters(props: Props) {
         ))}
       </select>
 
-      {active ? (
+      {isFilterActive(value) ? (
         <button
           type="button"
-          onClick={() => onChange(EMPTY_FILTER)}
+          onClick={() => props.onChange(EMPTY_FILTER)}
           className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
         >
           <XIcon className="h-3.5 w-3.5" />

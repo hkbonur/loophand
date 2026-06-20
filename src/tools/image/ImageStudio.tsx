@@ -43,7 +43,12 @@ function useSourceImage(src: string | null): HTMLImageElement | null {
 // working canvas, export (download), and resolve the task. Annotate overlay +
 // return-to-agent (recordOutput) land in ②b.
 export function ImageStudio(props: Props) {
-  const source = useSourceImage(props.task.screenshotUrl);
+  // Load the CORS-streamed proxy variant so drawing the image to the export
+  // canvas doesn't taint it (the plain proxy 302-redirects to R2, which sends no
+  // CORS headers).
+  const source = useSourceImage(
+    props.task.screenshotUrl ? `${props.task.screenshotUrl}?cors=1` : null,
+  );
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const [ops, setOps] = React.useState<ImageOp[]>([]);
   const [outputType, setOutputType] = React.useState<OutputType>("image/png");

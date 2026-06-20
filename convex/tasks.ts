@@ -328,10 +328,22 @@ async function readDeps(ctx: QueryCtx | MutationCtx, taskId: Id<"tasks">): Promi
   return deps;
 }
 
+// Open one blocked task if its deps (freshly re-read) are all approved and its
+// notBefore has passed. The single place that decides a release — shared by the
+// notBefore timer (unblockCheck) and the on-approval sweep (unblockDependents) —
+// so the fresh-read rule can't drift between them.
+async function tryOpenIfReady(ctx: MutationCtx, task: Doc<"tasks">, now: number): Promise<void> {
+  if (task.status !== "blocked") return;
+  const deps = await readDeps(ctx, task._id);
+  if (!canUnblock(deps, task.notBefore, now)) return;
+  await ctx.db.patch(task._id, { status: "open", updatedAt: now });
+  await maybeNotifyOwner(ctx, task.userId, task._id, now);
+}
+
 // A dep just became approved: re-check each blocked dependent against ALL its
-// deps (freshly read) and open the ones now satisfied. Re-reading every dep —
-// rather than trusting a counter — is what makes two deps finishing at once
-// resolve correctly instead of wedging a dependent blocked forever.
+// deps and open the ones now satisfied. Re-reading every dep — rather than
+// trusting a counter — is what makes two deps finishing at once resolve
+// correctly instead of wedging a dependent blocked forever.
 async function unblockDependents(ctx: MutationCtx, taskId: Id<"tasks">): Promise<void> {
   const edges = await ctx.db
     .query("taskDeps")
@@ -340,11 +352,7 @@ async function unblockDependents(ctx: MutationCtx, taskId: Id<"tasks">): Promise
   const now = Date.now();
   for (const edge of edges) {
     const dependent = await ctx.db.get(edge.taskId);
-    if (!dependent || dependent.status !== "blocked") continue;
-    const deps = await readDeps(ctx, dependent._id);
-    if (!canUnblock(deps, dependent.notBefore, now)) continue;
-    await ctx.db.patch(dependent._id, { status: "open", updatedAt: now });
-    await maybeNotifyOwner(ctx, dependent.userId, dependent._id, now);
+    if (dependent) await tryOpenIfReady(ctx, dependent, now);
   }
 }
 
@@ -916,12 +924,7 @@ export const unblockCheck = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
-    if (!task || task.status !== "blocked") return null;
-    const deps = await readDeps(ctx, args.taskId);
-    const now = Date.now();
-    if (!canUnblock(deps, task.notBefore, now)) return null;
-    await ctx.db.patch(args.taskId, { status: "open", updatedAt: now });
-    await maybeNotifyOwner(ctx, task.userId, args.taskId, now);
+    if (task) await tryOpenIfReady(ctx, task, Date.now());
     return null;
   },
 });

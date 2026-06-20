@@ -15,6 +15,7 @@ import { ConnectSnippet } from "./ConnectSnippet";
 import { COLUMNS, type TaskView } from "./types";
 import { useAgents } from "./useAgents";
 import { useBoardFilters } from "./useBoardFilters";
+import { keyToNavCommand, moveFocus, type Focus } from "./keyboard/boardKeymap";
 import { TASK_TYPES } from "../../convex/lib/taskConstants";
 import { toast } from "../ui/toaster";
 import { PushPrompt } from "../pwa/PushPrompt";
@@ -83,6 +84,41 @@ function BoardInner() {
     agents,
     activeProjectId,
   );
+
+  // Keyboard navigation: focus a card by {col,row} over the visible columns and
+  // open it with o/Enter. Disabled while a dialog or a text field has focus.
+  const columns = React.useMemo(
+    () => COLUMNS.map((column) => (visibleTasks ?? []).filter((t) => t.status === column.status)),
+    [visibleTasks],
+  );
+  const [focus, setFocus] = React.useState<Focus | null>(null);
+  const focusedTaskId = focus ? (columns[focus.col]?.[focus.row]?._id ?? null) : null;
+
+  React.useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (selectedTaskId) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      const command = keyToNavCommand(event.key);
+      if (!command) return;
+      event.preventDefault();
+      if (command === "open") {
+        if (focusedTaskId) setSelectedTaskId(focusedTaskId);
+        return;
+      }
+      setFocus((current) => moveFocus(columns.map((c) => c.length), current, command));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedTaskId, focusedTaskId, columns]);
 
   const onCreateProject = React.useCallback(
     async (name: string) => {
@@ -173,15 +209,16 @@ function BoardInner() {
             onOpen={setSelectedTaskId}
           />
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {COLUMNS.map((column) => (
+            {COLUMNS.map((column, index) => (
               <BoardColumn
                 key={column.status}
                 column={column}
-                tasks={(visibleTasks ?? []).filter((task: TaskView) => task.status === column.status)}
+                tasks={columns[index]}
                 now={now}
                 agents={agents}
                 loading={tasks === undefined}
                 onOpen={setSelectedTaskId}
+                focusedTaskId={focusedTaskId}
               />
             ))}
           </div>

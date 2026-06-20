@@ -11,6 +11,8 @@ interface Props {
   now: number;
   agents: AgentDirectory;
   onOpen: (taskId: TaskView["_id"]) => void;
+  // Keyboard-navigation focus (ring highlight).
+  focused?: boolean;
 }
 
 export function TaskCard(props: Props) {
@@ -19,7 +21,11 @@ export function TaskCard(props: Props) {
   const waitingOnYou = task.status === "open";
 
   return (
-    <Card interactive onClick={() => props.onOpen(task._id)}>
+    <Card
+      interactive
+      onClick={() => props.onOpen(task._id)}
+      className={props.focused ? "ring-2 ring-primary ring-offset-2 ring-offset-muted" : undefined}
+    >
       <div className="flex items-start justify-between gap-2">
         <h4 className="line-clamp-2 text-sm font-semibold leading-snug text-foreground">
           {task.title}

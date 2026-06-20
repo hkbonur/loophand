@@ -15,7 +15,13 @@ import { ConnectSnippet } from "./ConnectSnippet";
 import { COLUMNS, type TaskView } from "./types";
 import { useAgents } from "./useAgents";
 import { useBoardFilters } from "./useBoardFilters";
-import { keyToNavCommand, moveFocus, type Focus } from "./keyboard/boardKeymap";
+import {
+  keyToNavCommand,
+  keyToActionCommand,
+  canQuickApprove,
+  moveFocus,
+  type Focus,
+} from "./keyboard/boardKeymap";
 import { TASK_TYPES } from "../../convex/lib/taskConstants";
 import { toast } from "../ui/toaster";
 import { PushPrompt } from "../pwa/PushPrompt";
@@ -92,7 +98,38 @@ function BoardInner() {
     [visibleTasks],
   );
   const [focus, setFocus] = React.useState<Focus | null>(null);
-  const focusedTaskId = focus ? (columns[focus.col]?.[focus.row]?._id ?? null) : null;
+  const focusedTask = focus ? (columns[focus.col]?.[focus.row] ?? null) : null;
+  const focusedTaskId = focusedTask?._id ?? null;
+
+  const resolve = useMutation(api.tasks.resolve);
+  const reopen = useMutation(api.tasks.reopen);
+
+  // Approve the focused card in place, with an Undo affordance (valid until the
+  // agent consumes it). Used by the `a` shortcut; r/c open the dialog instead.
+  const quickApprove = React.useCallback(
+    (taskId: Id<"tasks">, revision: number) => {
+      void resolve({ taskId, action: "approve", revision })
+        .then(() => {
+          toast.success("Approved — sent back to the agent.", {
+            action: {
+              label: "Undo",
+              onClick: () => {
+                void reopen({ taskId })
+                  .then(() => toast.success("Reopened."))
+                  .catch((error) =>
+                    toast.error(error instanceof Error ? error.message : "Could not undo."),
+                  );
+              },
+            },
+          });
+          setFocus((current) => moveFocus(columns.map((c) => c.length), current, "down"));
+        })
+        .catch((error) =>
+          toast.error(error instanceof Error ? error.message : "Could not approve."),
+        );
+    },
+    [resolve, reopen, columns],
+  );
 
   React.useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -107,6 +144,17 @@ function BoardInner() {
       ) {
         return;
       }
+      const action = keyToActionCommand(event.key);
+      if (action) {
+        if (!focusedTask) return;
+        event.preventDefault();
+        if (action === "approve" && canQuickApprove(focusedTask)) {
+          quickApprove(focusedTask._id, focusedTask.revision);
+        } else {
+          setSelectedTaskId(focusedTask._id);
+        }
+        return;
+      }
       const command = keyToNavCommand(event.key);
       if (!command) return;
       event.preventDefault();
@@ -118,7 +166,7 @@ function BoardInner() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedTaskId, focusedTaskId, columns]);
+  }, [selectedTaskId, focusedTask, focusedTaskId, columns, quickApprove]);
 
   const onCreateProject = React.useCallback(
     async (name: string) => {

@@ -2,6 +2,7 @@ import React from "react";
 import { useQuery } from "convex/react";
 import { SignOutIcon } from "@phosphor-icons/react";
 import { api } from "../../convex/_generated/api";
+import { cn } from "../lib/cn";
 import { authClient } from "../convex-client";
 import { toast } from "../ui/toaster";
 import { ThemeCycleButton, ThemeSegmented, useTheme } from "./ThemeToggle";
@@ -15,7 +16,7 @@ function initialsOf(name: string | null, email: string): string {
 
 function Avatar(props: { image: string | null; name: string | null; email: string }) {
   return (
-    <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted text-xs font-semibold text-foreground">
+    <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-xs font-semibold tracking-wide text-foreground shadow-sm ring-1 ring-inset ring-foreground/10">
       {props.image ? (
         <img src={props.image} alt="" className="size-full object-cover" />
       ) : (
@@ -74,7 +75,12 @@ export function AccountMenu() {
         aria-expanded={open}
         aria-label={`Account: ${displayName}`}
         title={displayName}
-        className="rounded-full transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        className={cn(
+          "rounded-full ring-2 ring-transparent ring-offset-2 ring-offset-background transition duration-200 ease-out",
+          "hover:ring-border focus-visible:outline-none focus-visible:ring-ring/50",
+          "motion-safe:hover:scale-[1.04] motion-safe:active:scale-100",
+          open && "ring-foreground/25",
+        )}
       >
         <Avatar image={user.image} name={user.name} email={user.email} />
       </button>

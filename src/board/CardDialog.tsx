@@ -8,6 +8,7 @@ import { toast } from "../ui/toaster";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { ResultPanel } from "./ResultPanel";
 import { VisualReview } from "./visual-review/VisualReview";
+import { ImageStudio } from "../tools/image/ImageStudio";
 import { MultiItemReview } from "./item-rail/MultiItemReview";
 import { SectionLabel } from "./SectionLabel";
 import { staleNotice } from "./staleNotice";
@@ -29,7 +30,8 @@ export function CardDialog(props: Props) {
   const task = useQuery(api.tasks.get, { taskId: props.taskId });
   // Surfaces that need the full dialog width: the annotation canvas and the
   // multi-item rail.
-  const isWide = !!task && (task.type === "visual_review" || task.itemCount !== null);
+  const isWide =
+    !!task && (task.type === "visual_review" || task.type === "image" || task.itemCount !== null);
 
   // Remember the status the card had when it was opened, so we can tell a task
   // that went stale under the dialog (expired / agent-cancelled) from one the
@@ -195,5 +197,6 @@ function TaskPanel(props: { task: TaskView; onResolved: () => void }) {
   }
   if (task.status !== "open") return <ResultPanel task={task} />;
   if (task.type === "visual_review") return <VisualReview task={task} onResolved={onResolved} />;
+  if (task.type === "image") return <ImageStudio task={task} onResolved={onResolved} />;
   return <ApprovalPanel task={task} onResolved={onResolved} />;
 }

@@ -1,8 +1,8 @@
 // One source of truth for task-type vocabulary. `approval` ships first;
 // `visual_review` (annotate a screenshot) lands in Phase 2; `doc_review`
-// (annotate a rendered document) in Phase 3. Later phases add input / choice /
-// sketch / image / diff.
-export const TASK_TYPES = ["approval", "visual_review", "doc_review"] as const;
+// (annotate a rendered document) in Phase 3; `image` (the image studio —
+// transform/annotate an image) in Phase 6b. Later: pdf / html / sketch / diff.
+export const TASK_TYPES = ["approval", "visual_review", "doc_review", "image"] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
 
 export function isTaskType(value: string): value is TaskType {

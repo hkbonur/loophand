@@ -286,18 +286,19 @@ export const createForAgent = internalMutation({
       });
     }
 
-    // A visual_review must carry a screenshot; no other type accepts a payload.
-    if (args.type === "visual_review" && !args.toolPayload?.screenshotFileId) {
+    // visual_review and image both carry a source image in tool_payload; no other
+    // type accepts a payload.
+    const takesImagePayload = args.type === "visual_review" || args.type === "image";
+    if (takesImagePayload && !args.toolPayload?.screenshotFileId) {
       throw new ConvexError({
         code: "VALIDATION_ERROR",
-        message:
-          "visual_review requires tool_payload.screenshotFileId — upload one with upload_screenshot first.",
+        message: `${args.type} requires tool_payload.screenshotFileId — upload one with upload_screenshot first.`,
       });
     }
-    if (args.type !== "visual_review" && args.toolPayload) {
+    if (!takesImagePayload && args.toolPayload) {
       throw new ConvexError({
         code: "VALIDATION_ERROR",
-        message: `tool_payload is only valid for visual_review tasks, not "${args.type}".`,
+        message: `tool_payload is only valid for visual_review / image tasks, not "${args.type}".`,
       });
     }
 
@@ -347,7 +348,7 @@ export const createForAgent = internalMutation({
     // never produces a half-formed task. (After the idempotency check, so a
     // retry doesn't trip over its own already-consumed upload claim.)
     const screenshotFile =
-      args.type === "visual_review" && args.toolPayload
+      takesImagePayload && args.toolPayload
         ? await assertUploadOwnedBy(ctx, args.userId, args.toolPayload.screenshotFileId)
         : null;
     const toolPayload = screenshotFile
@@ -630,20 +631,21 @@ export const resolve = mutation({
         message: "Task changed since you loaded it. Reload and try again.",
       });
     }
+    // resolve() is the single-task path; visual_review and image mark up here, and
+    // only on the screenshot surface. (doc_review marks flow per-item through
+    // items.setStatus.)
+    const marksUp = task.type === "visual_review" || task.type === "image";
     if (args.annotations && args.annotations.length > 0) {
-      // resolve() is the single-task path; only visual_review marks up here, and
-      // only on the screenshot surface. (doc_review marks flow per-item through
-      // items.setStatus.)
-      if (task.type !== "visual_review") {
+      if (!marksUp) {
         throw new ConvexError({
           code: "VALIDATION_ERROR",
-          message: "annotations are only valid for visual_review tasks.",
+          message: "annotations are only valid for visual_review / image tasks.",
         });
       }
       if (args.annotations.some((a) => a.surface !== "screenshot")) {
         throw new ConvexError({
           code: "VALIDATION_ERROR",
-          message: "visual_review annotations must be on the screenshot surface.",
+          message: "annotations must be on the screenshot surface.",
         });
       }
     }
@@ -651,14 +653,14 @@ export const resolve = mutation({
     const mapping = RESOLUTION[args.action];
     const now = Date.now();
     const resultVersion = task.resultVersion + 1;
-    // visual_review returns tool-tagged, structured feedback (the annotations
-    // the human drew); every other type returns the plain decision + comment.
-    // A cancel always falls back to the plain shape — there's nothing to mark up.
+    // visual_review / image return tool-tagged, structured feedback (the
+    // annotations the human drew); every other type returns the plain decision +
+    // comment. A cancel always falls back to the plain shape — nothing to mark up.
     const result =
-      task.type === "visual_review" && args.action !== "cancel"
+      marksUp && args.action !== "cancel"
         ? {
             result_version: resultVersion,
-            tool: "visual_review" as const,
+            tool: task.type,
             decision: mapping.outcome,
             annotations: args.annotations ?? [],
             comment: args.comment ?? null,

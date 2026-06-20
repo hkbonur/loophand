@@ -621,11 +621,11 @@ describe("tasks.deps view + depCount", () => {
     const a = await create(t, ids);
     const b = await create(t, ids, [a.task_id]);
 
-    const bDeps = await asOwner.query(api.tasks.deps, { taskId: b.task_id });
+    const bDeps = await asOwner.query(api.deps.forTask, { taskId: b.task_id });
     expect(bDeps.blockedBy.map((d) => d._id)).toEqual([a.task_id]);
     expect(bDeps.blocks).toEqual([]);
 
-    const aDeps = await asOwner.query(api.tasks.deps, { taskId: a.task_id });
+    const aDeps = await asOwner.query(api.deps.forTask, { taskId: a.task_id });
     expect(aDeps.blocks.map((d) => d._id)).toEqual([b.task_id]);
     expect(aDeps.blockedBy).toEqual([]);
   });
@@ -636,7 +636,7 @@ describe("tasks.deps view + depCount", () => {
     await setupOwner(t, "stranger@example.com");
     const a = await create(t, owner);
     await expect(
-      t.withIdentity({ email: "stranger@example.com" }).query(api.tasks.deps, { taskId: a.task_id }),
+      t.withIdentity({ email: "stranger@example.com" }).query(api.deps.forTask, { taskId: a.task_id }),
     ).rejects.toThrow();
   });
 

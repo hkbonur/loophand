@@ -9,7 +9,7 @@ export type TaskStatus = TaskView["status"];
 export type TaskOutcome = NonNullable<TaskView["outcome"]>;
 
 // Dependency neighbours for the card dialog's mini-view.
-export type TaskDeps = FunctionReturnType<typeof api.tasks.deps>;
+export type TaskDeps = FunctionReturnType<typeof api.deps.forTask>;
 export type DepEntry = TaskDeps["blockedBy"][number];
 
 export interface Column {

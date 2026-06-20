@@ -86,7 +86,7 @@ function TaskDetails(props: { task: TaskView; onOpenTask?: (taskId: Id<"tasks">)
   const task = props.task;
   const agents = useAgents();
   const setTags = useMutation(api.tasks.setTags);
-  const deps = useQuery(api.tasks.deps, { taskId: task._id });
+  const deps = useQuery(api.deps.forTask, { taskId: task._id });
   const now = Date.now();
   // undefined = no attribution recorded (hide the row); null = the token is gone
   // (show "Unknown agent").

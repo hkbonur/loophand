@@ -10,6 +10,7 @@
 
 import type * as apiTokens from "../apiTokens.js";
 import type * as crons from "../crons.js";
+import type * as deps from "../deps.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as http_auth from "../http/auth.js";
@@ -75,6 +76,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   apiTokens: typeof apiTokens;
   crons: typeof crons;
+  deps: typeof deps;
   files: typeof files;
   http: typeof http;
   "http/auth": typeof http_auth;

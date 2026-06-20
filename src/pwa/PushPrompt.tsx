@@ -1,4 +1,4 @@
-import { Bell } from "@phosphor-icons/react";
+import { BellIcon } from "@phosphor-icons/react";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
 import { usePushNotifications, type PushNotifications } from "./usePushNotifications";
@@ -21,7 +21,7 @@ export function PushPrompt() {
   if (push.subscribed) {
     return (
       <div className="mb-6 flex items-center gap-2 text-xs text-muted-foreground">
-        <Bell className="h-3.5 w-3.5" />
+        <BellIcon className="h-3.5 w-3.5" />
         <span>Notifications on.</span>
         <button
           type="button"
@@ -37,7 +37,7 @@ export function PushPrompt() {
 
   return (
     <div className="mb-6 flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-2.5 text-sm">
-      <Bell className="h-4 w-4 shrink-0 text-muted-foreground" />
+      <BellIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
       <span className="text-muted-foreground">
         Get notified when an agent needs you — even with the tab closed.
       </span>

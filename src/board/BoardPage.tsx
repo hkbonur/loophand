@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
-import { Gear } from "@phosphor-icons/react";
+import { GearIcon } from "@phosphor-icons/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Spinner } from "../ui/spinner";
@@ -107,7 +107,7 @@ function BoardInner() {
           to="/settings/agents"
           className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground no-underline transition hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         >
-          <Gear className="h-4 w-4" />
+          <GearIcon className="h-4 w-4" />
           Agents
         </Link>
       </div>

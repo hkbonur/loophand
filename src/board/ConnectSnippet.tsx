@@ -1,5 +1,5 @@
+import { CheckIcon, CopyIcon } from "@phosphor-icons/react";
 import React from "react";
-import { Copy, Check } from "@phosphor-icons/react";
 import { toast } from "../ui/toaster";
 
 const MCP_URL = `${import.meta.env.VITE_CONVEX_SITE_URL ?? ""}/api/mcp`;
@@ -47,7 +47,7 @@ export function ConnectSnippet(props: Props) {
         aria-label="Copy snippet"
         className="absolute right-3 top-3 rounded-lg border border-border bg-card p-1.5 text-muted-foreground shadow-sm transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
       >
-        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+        {copied ? <CheckIcon className="h-3.5 w-3.5" /> : <CopyIcon className="h-3.5 w-3.5" />}
       </button>
       <pre className="overflow-auto rounded-2xl border border-border bg-muted p-4 text-left font-mono text-xs text-foreground">
         {config}

@@ -1,5 +1,5 @@
 import type React from "react";
-import { EnvelopeSimple } from "@phosphor-icons/react";
+import { EnvelopeSimpleIcon } from "@phosphor-icons/react";
 import { cn } from "../../lib/cn";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
@@ -65,7 +65,7 @@ export function FormCard(props: Props) {
               </>
             ) : (
               <>
-                <EnvelopeSimple className="size-4" weight="bold" />
+                <EnvelopeSimpleIcon className="size-4" weight="bold" />
                 Email me a sign-in link
               </>
             )}

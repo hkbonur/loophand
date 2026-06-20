@@ -1,6 +1,6 @@
 import React from "react";
 import { useMutation } from "convex/react";
-import { Check, X, Prohibit, Cursor, Square, ArrowUpRight, Pencil, MapPin, Trash } from "@phosphor-icons/react";
+import { CheckIcon, XIcon, ProhibitIcon, CursorIcon, SquareIcon, ArrowUpRightIcon, PencilIcon, MapPinIcon, TrashIcon } from "@phosphor-icons/react";
 import { api } from "../../../convex/_generated/api";
 import { cn } from "../../lib/cn";
 import { Button } from "../../ui/button";
@@ -18,12 +18,12 @@ const AnnotationCanvas = React.lazy(() =>
 
 type Action = "approve" | "request_changes" | "cancel";
 
-const TOOLS: { tool: Tool; label: string; Icon: typeof Square }[] = [
-  { tool: "select", label: "Select", Icon: Cursor },
-  { tool: "box", label: "Box", Icon: Square },
-  { tool: "arrow", label: "Arrow", Icon: ArrowUpRight },
-  { tool: "pen", label: "Pen", Icon: Pencil },
-  { tool: "pin", label: "Pin", Icon: MapPin },
+const TOOLS: { tool: Tool; label: string; Icon: typeof SquareIcon }[] = [
+  { tool: "select", label: "Select", Icon: CursorIcon },
+  { tool: "box", label: "Box", Icon: SquareIcon },
+  { tool: "arrow", label: "Arrow", Icon: ArrowUpRightIcon },
+  { tool: "pen", label: "Pen", Icon: PencilIcon },
+  { tool: "pin", label: "Pin", Icon: MapPinIcon },
 ];
 
 // On-screen width for each viewport frame: mobile renders at its true 375px,
@@ -39,7 +39,8 @@ interface Props {
 }
 
 export function VisualReview(props: Props) {
-  const { task, onResolved } = props;
+  const task = props.task;
+  const onResolved = props.onResolved;
   const resolve = useMutation(api.tasks.resolve);
   const ann = useAnnotations();
   const [comment, setComment] = React.useState("");
@@ -159,7 +160,7 @@ export function VisualReview(props: Props) {
                   className="ml-auto text-muted-foreground hover:text-destructive"
                   onClick={() => ann.removeMark(mark.id)}
                 >
-                  <Trash className="h-4 w-4" />
+                  <TrashIcon className="h-4 w-4" />
                 </button>
               </div>
               <Textarea
@@ -182,15 +183,15 @@ export function VisualReview(props: Props) {
 
       <div className="flex flex-wrap gap-2">
         <Button disabled={pending !== null} onClick={() => submit("approve")}>
-          {pending === "approve" ? <Spinner className="text-white" /> : <Check className="h-4 w-4" />}
+          {pending === "approve" ? <Spinner className="text-white" /> : <CheckIcon className="h-4 w-4" />}
           Approve
         </Button>
         <Button variant="secondary" disabled={pending !== null} onClick={() => submit("request_changes")}>
-          {pending === "request_changes" ? <Spinner /> : <X className="h-4 w-4" />}
+          {pending === "request_changes" ? <Spinner /> : <XIcon className="h-4 w-4" />}
           Request changes
         </Button>
         <Button variant="ghost" disabled={pending !== null} onClick={() => submit("cancel")}>
-          {pending === "cancel" ? <Spinner /> : <Prohibit className="h-4 w-4" />}
+          {pending === "cancel" ? <Spinner /> : <ProhibitIcon className="h-4 w-4" />}
           Cancel
         </Button>
       </div>

@@ -1,5 +1,5 @@
 import React from "react";
-import { X } from "@phosphor-icons/react";
+import { XIcon } from "@phosphor-icons/react";
 import { cn } from "../lib/cn";
 
 interface Props {
@@ -49,7 +49,7 @@ export function Dialog(props: Props) {
           aria-label="Close"
           className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         >
-          <X className="h-4 w-4" />
+          <XIcon className="h-4 w-4" />
         </button>
         {props.children}
       </div>

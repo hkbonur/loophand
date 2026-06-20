@@ -1,6 +1,6 @@
 import React from "react";
 import { useQuery } from "convex/react";
-import { SignOut } from "@phosphor-icons/react";
+import { SignOutIcon } from "@phosphor-icons/react";
 import { api } from "../../convex/_generated/api";
 import { authClient } from "../convex-client";
 import { toast } from "../ui/toaster";
@@ -106,7 +106,7 @@ export function AccountMenu() {
             disabled={signingOut}
             className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60"
           >
-            <SignOut className="h-4 w-4" weight="bold" />
+            <SignOutIcon className="h-4 w-4" weight="bold" />
             {signingOut ? "Signing out…" : "Sign out"}
           </button>
         </div>

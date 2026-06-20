@@ -1,6 +1,6 @@
 import React from "react";
 import { useMutation } from "convex/react";
-import { Check, X, Prohibit } from "@phosphor-icons/react";
+import { CheckIcon, XIcon, ProhibitIcon } from "@phosphor-icons/react";
 import { api } from "../../convex/_generated/api";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
@@ -62,7 +62,7 @@ export function ApprovalPanel(props: Props) {
           {pending === "approve" ? (
             <Spinner className="text-white" />
           ) : (
-            <Check className="h-4 w-4" />
+            <CheckIcon className="h-4 w-4" />
           )}
           Approve
         </Button>
@@ -71,11 +71,11 @@ export function ApprovalPanel(props: Props) {
           disabled={pending !== null}
           onClick={() => submit("request_changes")}
         >
-          {pending === "request_changes" ? <Spinner /> : <X className="h-4 w-4" />}
+          {pending === "request_changes" ? <Spinner /> : <XIcon className="h-4 w-4" />}
           Request changes
         </Button>
         <Button variant="ghost" disabled={pending !== null} onClick={() => submit("cancel")}>
-          {pending === "cancel" ? <Spinner /> : <Prohibit className="h-4 w-4" />}
+          {pending === "cancel" ? <Spinner /> : <ProhibitIcon className="h-4 w-4" />}
           Cancel
         </Button>
       </div>

@@ -1,4 +1,4 @@
-import { CircleNotch } from "@phosphor-icons/react";
+import { CircleNotchIcon } from "@phosphor-icons/react";
 import { cn } from "../lib/cn";
 
 interface Props {
@@ -7,6 +7,6 @@ interface Props {
 
 export function Spinner(props: Props) {
   return (
-    <CircleNotch weight="bold" className={cn("h-4 w-4 animate-spin", props.className)} />
+    <CircleNotchIcon weight="bold" className={cn("h-4 w-4 animate-spin", props.className)} />
   );
 }

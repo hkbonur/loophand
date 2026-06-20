@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { cn } from "../lib/cn";
 import { Button } from "../ui/button";
 import type { ProjectSummary } from "./types";
@@ -21,7 +21,7 @@ export function ProjectSwitcher(props: Props) {
     props.onCreate(trimmed);
     setName("");
     setCreating(false);
-  }, [name, props]);
+  }, [name, props.onCreate]);
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -67,7 +67,7 @@ export function ProjectSwitcher(props: Props) {
           onClick={() => setCreating(true)}
           className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         >
-          <Plus className="h-3.5 w-3.5" />
+          <PlusIcon />
           New project
         </button>
       )}

@@ -14,11 +14,11 @@ export function ResultPanel(props: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      {badge ? (
+      {badge && (
         <div>
           <Badge tone={badge.tone}>{`${badge.icon} ${badge.label}`}</Badge>
         </div>
-      ) : null}
+      )}
       <div>
         <SectionLabel>Returns to the agent</SectionLabel>
         {isVisualReviewResult(task.result) ? (

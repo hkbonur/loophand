@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
-import { ArrowLeft, Key, Trash } from "@phosphor-icons/react";
+import { ArrowLeftIcon, KeyIcon, TrashIcon } from "@phosphor-icons/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Button } from "../ui/button";
@@ -51,7 +51,7 @@ export function AgentsPanel() {
         to="/"
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground no-underline hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" />
+        <ArrowLeftIcon className="h-4 w-4" />
         Back to board
       </Link>
 
@@ -75,7 +75,7 @@ export function AgentsPanel() {
             />
           </div>
           <Button disabled={minting} onClick={mint}>
-            {minting ? <Spinner className="text-white" /> : <Key className="h-4 w-4" />}
+            {minting ? <Spinner className="text-white" /> : <KeyIcon className="h-4 w-4" />}
             Mint key
           </Button>
         </div>
@@ -113,7 +113,7 @@ export function AgentsPanel() {
                   <Badge tone="danger">Revoked</Badge>
                 ) : (
                   <Button variant="ghost" size="sm" onClick={() => revoke(token._id)}>
-                    <Trash className="h-3.5 w-3.5" />
+                    <TrashIcon className="h-3.5 w-3.5" />
                     Revoke
                   </Button>
                 )}

@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
-import { Moon, Monitor, Sun } from "@phosphor-icons/react";
+import { MoonIcon, MonitorIcon, SunIcon } from "@phosphor-icons/react";
 import { cn } from "../lib/cn";
 
 export type ThemeMode = "light" | "dark" | "auto";
 
-const MODES: { mode: ThemeMode; label: string; Icon: typeof Sun }[] = [
-  { mode: "light", label: "Light", Icon: Sun },
-  { mode: "auto", label: "System", Icon: Monitor },
-  { mode: "dark", label: "Dark", Icon: Moon },
+const MODES: { mode: ThemeMode; label: string; Icon: typeof SunIcon }[] = [
+  { mode: "light", label: "Light", Icon: SunIcon },
+  { mode: "auto", label: "System", Icon: MonitorIcon },
+  { mode: "dark", label: "Dark", Icon: MoonIcon },
 ];
 
-const ICONS: Record<ThemeMode, typeof Sun> = {
-  light: Sun,
-  dark: Moon,
-  auto: Monitor,
+const ICONS: Record<ThemeMode, typeof SunIcon> = {
+  light: SunIcon,
+  dark: MoonIcon,
+  auto: MonitorIcon,
 };
 
 function getInitialMode(): ThemeMode {
@@ -85,7 +85,8 @@ interface ControlProps {
 
 /** Compact cycling icon button — used as floating chrome when signed out. */
 export function ThemeCycleButton(props: ControlProps) {
-  const { mode, setMode } = props;
+  const mode = props.mode;
+  const setMode = props.setMode;
   const next: ThemeMode = mode === "light" ? "dark" : mode === "dark" ? "auto" : "light";
   const label =
     mode === "auto"
@@ -108,7 +109,8 @@ export function ThemeCycleButton(props: ControlProps) {
 
 /** Three-way segmented control — used inside the account popup. */
 export function ThemeSegmented(props: ControlProps) {
-  const { mode, setMode } = props;
+  const mode = props.mode;
+  const setMode = props.setMode;
   return (
     <div
       role="radiogroup"

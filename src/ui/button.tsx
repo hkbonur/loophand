@@ -38,7 +38,7 @@ export function Button(props: Props) {
       title={props.title}
       onClick={props.onClick}
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 rounded-full font-semibold leading-none transition",
+        "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-semibold leading-none transition",
         "disabled:pointer-events-none disabled:opacity-50",
         VARIANT_CLASSES[variant],
         SIZE_CLASSES[size],

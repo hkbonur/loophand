@@ -119,7 +119,7 @@ function BoardInner() {
           title="Waiting for your first task"
           description="Connect an agent with the snippet below. The moment it calls create_task, a card appears here — live."
         >
-          <div className="mt-4">
+          <div className="mt-4 w-full min-w-0">
             <ConnectSnippet />
           </div>
         </Empty>

@@ -97,3 +97,37 @@ describe("tasks.addComment", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("get_task surfacing (consumeForAgent)", () => {
+  test("returns comments ascending, derived guidance, and resolved preferences", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId, projectId, taskId } = await setupTask(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+
+    await asOwner.mutation(api.tasks.addComment, { taskId, body: "use the brand palette" });
+    await asOwner.mutation(api.tasks.addComment, { taskId, body: "actually, keep it neutral" });
+    await asOwner.mutation(api.preferences.set, { key: "brand-color", value: "#000" });
+    await asOwner.mutation(api.preferences.set, { key: "brand-color", value: "#fff", projectId });
+
+    const detail = await t.mutation(internal.tasks.consumeForAgent, { userId, tokenId, taskId });
+
+    expect(detail.comments.map((c) => c.body)).toEqual([
+      "use the brand palette",
+      "actually, keep it neutral",
+    ]);
+    expect(detail.comments.every((c) => c.author === "human")).toBe(true);
+    expect(detail.guidance).toBe("actually, keep it neutral");
+    expect(detail.preferences).toEqual({ "brand-color": "#fff" });
+  });
+
+  test("returns empty comments and null guidance when none exist", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId, taskId } = await setupTask(t, "owner@example.com");
+
+    const detail = await t.mutation(internal.tasks.consumeForAgent, { userId, tokenId, taskId });
+
+    expect(detail.comments).toEqual([]);
+    expect(detail.guidance).toBeNull();
+    expect(detail.preferences).toEqual({});
+  });
+});

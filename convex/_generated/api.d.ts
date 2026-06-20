@@ -37,6 +37,7 @@ import type * as http_mcp_tools_tasks_index from "../http/mcp/tools/tasks/index.
 import type * as http_mcp_tools_tasks_listProjects from "../http/mcp/tools/tasks/listProjects.js";
 import type * as http_mcp_tools_tasks_listTasks from "../http/mcp/tools/tasks/listTasks.js";
 import type * as http_mcp_tools_tasks_resumeItems from "../http/mcp/tools/tasks/resumeItems.js";
+import type * as http_mcp_tools_tasks_roundTripShapes from "../http/mcp/tools/tasks/roundTripShapes.js";
 import type * as http_mcp_tools_tasks_uploadScreenshot from "../http/mcp/tools/tasks/uploadScreenshot.js";
 import type * as http_mcp_types from "../http/mcp/types.js";
 import type * as http_storage from "../http/storage.js";
@@ -44,6 +45,7 @@ import type * as items from "../items.js";
 import type * as lib_apiTokenAuth from "../lib/apiTokenAuth.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_clientIp from "../lib/clientIp.js";
+import type * as lib_comments from "../lib/comments.js";
 import type * as lib_cors from "../lib/cors.js";
 import type * as lib_deps from "../lib/deps.js";
 import type * as lib_email from "../lib/email.js";
@@ -108,6 +110,7 @@ declare const fullApi: ApiFromModules<{
   "http/mcp/tools/tasks/listProjects": typeof http_mcp_tools_tasks_listProjects;
   "http/mcp/tools/tasks/listTasks": typeof http_mcp_tools_tasks_listTasks;
   "http/mcp/tools/tasks/resumeItems": typeof http_mcp_tools_tasks_resumeItems;
+  "http/mcp/tools/tasks/roundTripShapes": typeof http_mcp_tools_tasks_roundTripShapes;
   "http/mcp/tools/tasks/uploadScreenshot": typeof http_mcp_tools_tasks_uploadScreenshot;
   "http/mcp/types": typeof http_mcp_types;
   "http/storage": typeof http_storage;
@@ -115,6 +118,7 @@ declare const fullApi: ApiFromModules<{
   "lib/apiTokenAuth": typeof lib_apiTokenAuth;
   "lib/auth": typeof lib_auth;
   "lib/clientIp": typeof lib_clientIp;
+  "lib/comments": typeof lib_comments;
   "lib/cors": typeof lib_cors;
   "lib/deps": typeof lib_deps;
   "lib/email": typeof lib_email;

@@ -29,5 +29,4 @@ export interface AgentTaskView {
 export interface AgentTaskDetail extends AgentTaskView {
   comments: AgentComment[];
   guidance: string | null;
-  preferences: Record<string, string>;
 }

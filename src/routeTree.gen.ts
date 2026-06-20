@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SettingsPreferencesRouteImport } from './routes/settings.preferences'
 import { Route as SettingsAgentsRouteImport } from './routes/settings.agents'
 
 const LoginRoute = LoginRouteImport.update({
@@ -24,11 +23,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsPreferencesRoute = SettingsPreferencesRouteImport.update({
-  id: '/settings/preferences',
-  path: '/settings/preferences',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SettingsAgentsRoute = SettingsAgentsRouteImport.update({
   id: '/settings/agents',
   path: '/settings/agents',
@@ -39,34 +33,30 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/settings/agents': typeof SettingsAgentsRoute
-  '/settings/preferences': typeof SettingsPreferencesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/settings/agents': typeof SettingsAgentsRoute
-  '/settings/preferences': typeof SettingsPreferencesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/settings/agents': typeof SettingsAgentsRoute
-  '/settings/preferences': typeof SettingsPreferencesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/settings/agents' | '/settings/preferences'
+  fullPaths: '/' | '/login' | '/settings/agents'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/settings/agents' | '/settings/preferences'
-  id: '__root__' | '/' | '/login' | '/settings/agents' | '/settings/preferences'
+  to: '/' | '/login' | '/settings/agents'
+  id: '__root__' | '/' | '/login' | '/settings/agents'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   SettingsAgentsRoute: typeof SettingsAgentsRoute
-  SettingsPreferencesRoute: typeof SettingsPreferencesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -85,13 +75,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/preferences': {
-      id: '/settings/preferences'
-      path: '/settings/preferences'
-      fullPath: '/settings/preferences'
-      preLoaderRoute: typeof SettingsPreferencesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/settings/agents': {
       id: '/settings/agents'
       path: '/settings/agents'
@@ -106,7 +89,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   SettingsAgentsRoute: SettingsAgentsRoute,
-  SettingsPreferencesRoute: SettingsPreferencesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

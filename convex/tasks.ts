@@ -29,7 +29,6 @@ import {
   MAX_RETURNED_COMMENTS,
   type AgentComment,
 } from "./lib/comments";
-import { resolveForProject } from "./preferences";
 import { rateLimiter } from "./rateLimit";
 import { enforceLimit } from "./lib/rateLimitGuard";
 import { initialTaskState } from "./lib/deps";
@@ -94,8 +93,8 @@ const agentViewFields = {
 const agentViewValidator = v.object(agentViewFields);
 
 // The richer view get_task / await_task return on consume: the base view plus
-// the round-trip context an agent reads before acting — the comment thread, the
-// freshest human guidance, and the project's resolved preferences.
+// the round-trip context an agent reads before acting — the comment thread and
+// the freshest human guidance.
 const commentEntryValidator = v.object({
   body: v.string(),
   created_at: v.number(),
@@ -104,7 +103,6 @@ const agentTaskDetailValidator = v.object({
   ...agentViewFields,
   comments: v.array(commentEntryValidator),
   guidance: v.union(v.string(), v.null()),
-  preferences: v.record(v.string(), v.string()),
 });
 
 // Human-facing card payload — the full task as the board renders it.
@@ -451,7 +449,7 @@ async function commentsForTask(
 }
 
 // get_task / await_task consume point: flips a resolved task to Agent working and
-// returns the round-trip context (comments, guidance, preferences) alongside it.
+// returns the round-trip context (comments, guidance) alongside it.
 export const consumeForAgent = internalMutation({
   args: { userId: v.id("users"), tokenId: v.id("apiTokens"), taskId: v.string() },
   returns: agentTaskDetailValidator,
@@ -459,14 +457,12 @@ export const consumeForAgent = internalMutation({
     const task = await assertOwnedTask(ctx, requireTaskId(ctx, args.taskId), args.userId);
     const consumed = await consumeIfResolved(ctx, task, args.tokenId);
     const thread = await commentsForTask(ctx, consumed._id);
-    const preferences = await resolveForProject(ctx, args.userId, consumed.projectId);
     return {
       ...toAgentView(consumed),
       // Guidance comes from the full thread; the returned slice is bounded so the
       // payload stays small on long-lived tasks.
       comments: thread.slice(-MAX_RETURNED_COMMENTS),
       guidance: latestGuidance(thread),
-      preferences,
     };
   },
 });

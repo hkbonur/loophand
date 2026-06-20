@@ -6,5 +6,3 @@ export const commentShape = z.object({
   body: z.string(),
   created_at: z.number(),
 });
-
-export const preferencesShape = z.record(z.string(), z.string());

@@ -752,6 +752,23 @@ export const addComment = mutation({
   },
 });
 
+// The task's comment thread for the board, oldest first. Owner-scoped.
+export const comments = query({
+  args: { taskId: v.id("tasks") },
+  returns: v.array(commentViewValidator),
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    await assertOwnedTask(ctx, args.taskId, userId);
+    const rows = await ctx.db
+      .query("taskComments")
+      .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+      .collect();
+    return rows
+      .sort((a, b) => a.createdAt - b.createdAt)
+      .map((r) => ({ _id: r._id, body: r.body, createdAt: r.createdAt }));
+  },
+});
+
 // Human archive: Agent working → Done.
 export const close = mutation({
   args: { taskId: v.id("tasks") },

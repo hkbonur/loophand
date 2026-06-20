@@ -150,3 +150,27 @@ describe("get_task surfacing (consumeForAgent)", () => {
     expect(detail.preferences).toEqual({});
   });
 });
+
+describe("tasks.comments (board query)", () => {
+  test("lists an owned task's comments oldest-first", async () => {
+    const t = convexTest(schema, modules);
+    const { taskId } = await setupTask(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+
+    await asOwner.mutation(api.tasks.addComment, { taskId, body: "first" });
+    await asOwner.mutation(api.tasks.addComment, { taskId, body: "second" });
+
+    const comments = await asOwner.query(api.tasks.comments, { taskId });
+    expect(comments.map((c) => c.body)).toEqual(["first", "second"]);
+  });
+
+  test("rejects reading comments on a task you don't own", async () => {
+    const t = convexTest(schema, modules);
+    const { taskId } = await setupTask(t, "owner@example.com");
+    await setupTask(t, "stranger@example.com");
+
+    await expect(
+      t.withIdentity({ email: "stranger@example.com" }).query(api.tasks.comments, { taskId }),
+    ).rejects.toThrow();
+  });
+});

@@ -9,6 +9,10 @@ import { internalMutation } from "./_generated/server";
 export const rateLimiter = new RateLimiter(components.rateLimiter, {
   authFailure: { kind: "token bucket", rate: 30, period: MINUTE, capacity: 30 },
   magicLink: { kind: "token bucket", rate: 5, period: MINUTE, capacity: 5 },
+  // Per-agent (token-keyed) create budget. Groundwork for the full limits in
+  // Phase 6 — generous enough to never bite normal use, a backstop against a
+  // runaway agent flooding the board. Enforced fail-open in tasks.createForAgent.
+  createTask: { kind: "token bucket", rate: 30, period: MINUTE, capacity: 60 },
 });
 
 // Returns `true` when the caller has exhausted its failure budget.

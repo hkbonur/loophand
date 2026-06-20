@@ -22,6 +22,9 @@ import {
 } from "./schema";
 import { isTaskType, TASK_TYPES, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
 import { assertDocItemData } from "./lib/render";
+import { normalizeTags } from "./lib/tags";
+import { rateLimiter } from "./rateLimit";
+import { enforceLimit } from "./lib/rateLimitGuard";
 
 const statusValidator = v.union(...TASK_STATUSES.map((s) => v.literal(s)));
 const outcomeValidator = v.union(...TASK_OUTCOMES.map((o) => v.literal(o)));
@@ -313,6 +316,13 @@ export const createForAgent = internalMutation({
       if (existing) return { task: toAgentView(existing), reused: true };
     }
 
+    // Per-agent create backstop (fail-open). Charged only for a real create —
+    // after the idempotency short-circuit, so retries don't burn the budget.
+    await enforceLimit(
+      () => rateLimiter.limit(ctx, "createTask", { key: args.tokenId }),
+      "create_task",
+    );
+
     const projectId = await resolveProjectRef(ctx, args.userId, args.project);
 
     // Resolve the screenshot before inserting so an invalid/unowned file id
@@ -338,7 +348,7 @@ export const createForAgent = internalMutation({
       title: args.title,
       instructions: args.instructions,
       acceptanceCriteria: args.acceptanceCriteria,
-      tags: args.tags ?? [],
+      tags: normalizeTags(args.tags),
       status: "open",
       toolPayload,
       itemCount: items ? items.length : undefined,
@@ -621,6 +631,21 @@ export const resolve = mutation({
   },
 });
 
+// Human-set tags from the board. Normalized on write (trim/lowercase/dedupe/cap)
+// so agent- and human-supplied tags share one hygiene path.
+export const setTags = mutation({
+  args: { taskId: v.id("tasks"), tags: v.array(v.string()) },
+  returns: taskViewValidator,
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    await assertOwnedTask(ctx, args.taskId, userId);
+    await ctx.db.patch(args.taskId, { tags: normalizeTags(args.tags), updatedAt: Date.now() });
+    const updated = await ctx.db.get(args.taskId);
+    if (!updated) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
+    return enrichTaskView(ctx, updated);
+  },
+});
+
 // Human archive: Agent working → Done.
 export const close = mutation({
   args: { taskId: v.id("tasks") },
@@ -634,7 +659,16 @@ export const close = mutation({
         message: `Only a resumed task can be closed (was "${task.status}").`,
       });
     }
-    await ctx.db.patch(args.taskId, { status: "done", updatedAt: Date.now() });
+    const now = Date.now();
+    await ctx.db.patch(args.taskId, { status: "done", updatedAt: now });
+    await ctx.db.insert("taskAudit", {
+      taskId: args.taskId,
+      userId,
+      action: "close",
+      fromStatus: "resumed",
+      toStatus: "done",
+      createdAt: now,
+    });
     return null;
   },
 });

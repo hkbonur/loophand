@@ -1,11 +1,14 @@
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { outcomeBadge, relativeAge } from "./format";
+import { AgentChip } from "./AgentChip";
+import type { AgentDirectory } from "./useAgents";
 import type { TaskView } from "./types";
 
 interface Props {
   task: TaskView;
   now: number;
+  agents: AgentDirectory;
   onOpen: (taskId: TaskView["_id"]) => void;
 }
 
@@ -34,9 +37,14 @@ export function TaskCard(props: Props) {
           </Badge>
         ))}
       </div>
-      <p className="mt-2 text-xs tabular-nums text-muted-foreground">
-        {relativeAge(task.createdAt, props.now)}
-      </p>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="shrink-0 text-xs tabular-nums text-muted-foreground">
+          {relativeAge(task.createdAt, props.now)}
+        </p>
+        {task.createdByTokenId ? (
+          <AgentChip agent={props.agents.get(task.createdByTokenId) ?? null} now={props.now} />
+        ) : null}
+      </div>
     </Card>
   );
 }

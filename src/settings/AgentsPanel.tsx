@@ -10,6 +10,7 @@ import { Spinner } from "../ui/spinner";
 import { Empty } from "../ui/empty";
 import { ConnectSnippet } from "../board/ConnectSnippet";
 import { toast } from "../ui/toaster";
+import { lastSeenLabel, isAgentDark } from "../lib/agentActivity";
 
 export function AgentsPanel() {
   const tokens = useQuery(api.apiTokens.list, {});
@@ -18,6 +19,12 @@ export function AgentsPanel() {
   const [name, setName] = React.useState("");
   const [minting, setMinting] = React.useState(false);
   const [freshKey, setFreshKey] = React.useState<string | null>(null);
+  const [now, setNow] = React.useState(() => Date.now());
+
+  React.useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const mint = React.useCallback(async () => {
     setMinting(true);
@@ -99,27 +106,51 @@ export function AgentsPanel() {
         <Empty title="No keys yet" description="Mint one above to connect your first agent." />
       ) : (
         <ul className="flex flex-col gap-2">
-          {tokens.map((token) => (
-            <li
-              key={token._id}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-foreground">{token.name}</p>
-                <p className="font-mono text-xs text-muted-foreground">{token.tokenPrefix}…</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {token.isRevoked ? (
-                  <Badge tone="danger">Revoked</Badge>
-                ) : (
-                  <Button variant="ghost" size="sm" onClick={() => revoke(token._id)}>
-                    <TrashIcon className="h-3.5 w-3.5" />
-                    Revoke
-                  </Button>
-                )}
-              </div>
-            </li>
-          ))}
+          {tokens.map((token) => {
+            const scopes = token.scope?.split(/\s+/).filter(Boolean) ?? [];
+            const dark = !token.isRevoked && isAgentDark(token.lastUsedAt, now);
+            return (
+              <li
+                key={token._id}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    {dark ? (
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground/50"
+                        title="Idle — no recent activity"
+                      />
+                    ) : null}
+                    <p className="truncate text-sm font-semibold text-foreground">{token.name}</p>
+                  </div>
+                  <p className="font-mono text-xs text-muted-foreground">{token.tokenPrefix}…</p>
+                  {scopes.length > 0 ? (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {scopes.map((scope) => (
+                        <Badge key={scope} tone="info">
+                          {scope}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  {token.isRevoked ? (
+                    <Badge tone="danger">Revoked</Badge>
+                  ) : (
+                    <Button variant="ghost" size="sm" onClick={() => revoke(token._id)}>
+                      <TrashIcon className="h-3.5 w-3.5" />
+                      Revoke
+                    </Button>
+                  )}
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {lastSeenLabel(token.lastUsedAt, now)}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </main>

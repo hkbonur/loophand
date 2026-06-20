@@ -8,9 +8,13 @@ import { Spinner } from "../ui/spinner";
 import { Empty } from "../ui/empty";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { BoardColumn } from "./BoardColumn";
+import { BoardFilters } from "./BoardFilters";
 import { CardDialog } from "./CardDialog";
 import { ConnectSnippet } from "./ConnectSnippet";
 import { COLUMNS, type TaskView } from "./types";
+import { useAgents } from "./useAgents";
+import { useBoardFilters } from "./useBoardFilters";
+import { TASK_TYPES } from "../../convex/lib/taskConstants";
 import { toast } from "../ui/toaster";
 import { PushPrompt } from "../pwa/PushPrompt";
 
@@ -72,6 +76,12 @@ function BoardInner() {
   }, []);
 
   const tasks = useQuery(api.tasks.list, activeProjectId ? { projectId: activeProjectId } : "skip");
+  const agents = useAgents();
+  const { filter, setFilter, tagOptions, agentOptions, visibleTasks } = useBoardFilters(
+    tasks,
+    agents,
+    activeProjectId,
+  );
 
   const onCreateProject = React.useCallback(
     async (name: string) => {
@@ -127,18 +137,32 @@ function BoardInner() {
           </div>
         </Empty>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {COLUMNS.map((column) => (
-            <BoardColumn
-              key={column.status}
-              column={column}
-              tasks={(tasks ?? []).filter((task: TaskView) => task.status === column.status)}
-              now={now}
-              loading={tasks === undefined}
-              onOpen={setSelectedTaskId}
-            />
-          ))}
-        </div>
+        <>
+          {tasks && tasks.length > 0 ? (
+            <div className="mb-4">
+              <BoardFilters
+                tags={tagOptions}
+                agents={agentOptions}
+                types={[...TASK_TYPES]}
+                value={filter}
+                onChange={setFilter}
+              />
+            </div>
+          ) : null}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {COLUMNS.map((column) => (
+              <BoardColumn
+                key={column.status}
+                column={column}
+                tasks={(visibleTasks ?? []).filter((task: TaskView) => task.status === column.status)}
+                now={now}
+                agents={agents}
+                loading={tasks === undefined}
+                onOpen={setSelectedTaskId}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {selectedTaskId ? (

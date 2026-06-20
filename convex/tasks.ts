@@ -57,6 +57,9 @@ const agentViewValidator = v.object({
   result: v.any(),
   result_version: v.number(),
   revision: v.number(),
+  // Present only on multi-item tasks (ADR-0002).
+  item_count: v.union(v.number(), v.null()),
+  items_done: v.union(v.number(), v.null()),
 });
 
 // Human-facing card payload — the full task as the board renders it.
@@ -75,6 +78,9 @@ const taskViewValidator = v.object({
   toolPayload: v.union(toolPayloadValidator, v.null()),
   // Resolved storage-proxy URL for the visual_review screenshot, or null.
   screenshotUrl: v.union(v.string(), v.null()),
+  // Multi-item progress for the ItemRail chip (null on single tasks).
+  itemCount: v.union(v.number(), v.null()),
+  itemsDone: v.union(v.number(), v.null()),
   resultVersion: v.number(),
   revision: v.number(),
   createdByTokenId: v.union(v.id("apiTokens"), v.null()),
@@ -95,6 +101,8 @@ function toAgentView(task: Doc<"tasks">) {
     result: task.result ?? null,
     result_version: task.resultVersion,
     revision: task.revision,
+    item_count: task.itemCount ?? null,
+    items_done: task.itemsDone ?? null,
   };
 }
 
@@ -110,6 +118,8 @@ function toTaskView(task: Doc<"tasks">) {
     status: task.status,
     outcome: task.outcome ?? null,
     result: task.result ?? null,
+    itemCount: task.itemCount ?? null,
+    itemsDone: task.itemsDone ?? null,
     resultVersion: task.resultVersion,
     revision: task.revision,
     createdByTokenId: task.createdByTokenId ?? null,
@@ -224,6 +234,11 @@ export const createForAgent = internalMutation({
     acceptanceCriteria: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
     toolPayload: v.optional(toolPayloadInputValidator),
+    // Multi-item (opt-in): each entry becomes a rail item the human reviews in
+    // place. `data` is the per-item surface payload (e.g. a doc render spec).
+    items: v.optional(
+      v.array(v.object({ title: v.optional(v.string()), data: v.optional(v.any()) })),
+    ),
     idempotencyKey: v.optional(v.string()),
     ttlSeconds: v.optional(v.number()),
   },
@@ -248,6 +263,15 @@ export const createForAgent = internalMutation({
       throw new ConvexError({
         code: "VALIDATION_ERROR",
         message: `tool_payload is only valid for visual_review tasks, not "${args.type}".`,
+      });
+    }
+
+    // A multi-item task carries its surface per item, not in tool_payload.
+    const items = args.items && args.items.length > 0 ? args.items : undefined;
+    if (items && args.toolPayload) {
+      throw new ConvexError({
+        code: "VALIDATION_ERROR",
+        message: "Pass either items[] (multi-item) or tool_payload (single), not both.",
       });
     }
 
@@ -290,6 +314,8 @@ export const createForAgent = internalMutation({
       tags: args.tags ?? [],
       status: "open",
       toolPayload,
+      itemCount: items ? items.length : undefined,
+      itemsDone: items ? 0 : undefined,
       resultVersion: 0,
       revision: 0,
       idempotencyKey: args.idempotencyKey,
@@ -297,6 +323,20 @@ export const createForAgent = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    if (items) {
+      for (const [order, item] of items.entries()) {
+        await ctx.db.insert("taskItems", {
+          taskId,
+          order,
+          kind: args.type,
+          title: item.title,
+          data: item.data,
+          status: "pending",
+          createdAt: now,
+        });
+      }
+    }
 
     if (screenshotFile) await attachUploadToTask(ctx, screenshotFile, taskId);
 
@@ -327,16 +367,28 @@ export const consumeForAgent = internalMutation({
 });
 
 // Read-only status probe for the await_task long-poll (never mutates).
+// `awaitReady` is the wake signal: a single task is ready once it leaves the
+// human's hands; a multi-item task is also ready on a full pass (itemsDone ===
+// itemCount) even though it stays `open` for the next round (ADR-0002).
 export const statusForAgent = internalQuery({
   args: { userId: v.id("users"), taskId: v.string() },
   returns: v.object({
     status: statusValidator,
     outcome: v.union(outcomeValidator, v.null()),
     revision: v.number(),
+    awaitReady: v.boolean(),
   }),
   handler: async (ctx, args) => {
     const task = await assertOwnedTask(ctx, requireTaskId(ctx, args.taskId), args.userId);
-    return { status: task.status, outcome: task.outcome ?? null, revision: task.revision };
+    const left = task.status === "awaiting_agent" || task.status === "resumed";
+    const fullPass = task.itemCount !== undefined && (task.itemsDone ?? 0) === task.itemCount;
+    const awaitReady = left || task.status === "done" || fullPass;
+    return {
+      status: task.status,
+      outcome: task.outcome ?? null,
+      revision: task.revision,
+      awaitReady,
+    };
   },
 });
 

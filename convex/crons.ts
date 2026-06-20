@@ -43,5 +43,10 @@ crons.daily(
   { hourUTC: 4, minuteUTC: 0 },
   internal.crons.cleanupExpiredUploads,
 );
+crons.daily(
+  "reconcile-item-counts",
+  { hourUTC: 4, minuteUTC: 15 },
+  internal.reconcile.itemCounts,
+);
 
 export default crons;

@@ -15,6 +15,18 @@ import { v } from "convex/values";
 export const TASK_STATUSES = ["open", "awaiting_agent", "resumed", "done", "blocked"] as const;
 const taskStatus = v.union(...TASK_STATUSES.map((s) => v.literal(s)));
 
+// Per-item state inside a multi-item task. `pending` until the human acts;
+// `approved`/`changes_requested`/`skipped` are the human verdicts. Drives the
+// item loop (ADR-0002): a task auto-completes when no item is `pending` and none
+// is `changes_requested`.
+export const TASK_ITEM_STATUSES = [
+  "pending",
+  "approved",
+  "changes_requested",
+  "skipped",
+] as const;
+const taskItemStatus = v.union(...TASK_ITEM_STATUSES.map((s) => v.literal(s)));
+
 // Outcome = a separate badge, orthogonal to status.
 export const TASK_OUTCOMES = [
   "approved",
@@ -177,6 +189,11 @@ export default defineSchema({
     resumedByTokenId: v.optional(v.id("apiTokens")),
     resultConsumedAt: v.optional(v.number()),
     idempotencyKey: v.optional(v.string()),
+    // Multi-item bookkeeping (Phase 3, opt-in). Set only when the agent supplied
+    // `items[]` at create. `itemsDone` = count of non-pending items; when it
+    // reaches `itemCount` the rollup wakes await_task (ADR-0002).
+    itemCount: v.optional(v.number()),
+    itemsDone: v.optional(v.number()),
     expiresAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -188,13 +205,19 @@ export default defineSchema({
     .index("by_idempotency", ["userId", "idempotencyKey"])
     .index("by_expires", ["expiresAt"]),
 
-  // Ordered attachments / rail items for a task (multi-item review, Phase 3).
+  // Ordered rail items for a multi-item task (Phase 3). `kind` mirrors the task
+  // type; `data` carries the per-item surface payload (e.g. a doc render spec or
+  // a screenshot id). `status` is the human verdict; `result` is the per-item
+  // feedback echoed into the task rollup.
   taskItems: defineTable({
     taskId: v.id("tasks"),
     order: v.number(),
     kind: v.string(),
     title: v.optional(v.string()),
     data: v.optional(v.any()),
+    status: taskItemStatus,
+    result: v.optional(v.any()),
+    updatedAt: v.optional(v.number()),
     createdAt: v.number(),
   }).index("by_task_order", ["taskId", "order"]),
 

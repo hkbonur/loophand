@@ -26,11 +26,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// A resolved task is anything past the human's hands: awaiting_agent (just
-// resolved), resumed (already consumed once), or done (cancelled/expired).
-function isResolved(status: AgentTaskView["status"]): boolean {
-  return status === "awaiting_agent" || status === "resumed" || status === "done";
-}
 
 export const awaitTaskTool = defineTool({
   name: "await_task",
@@ -52,14 +47,16 @@ export const awaitTaskTool = defineTool({
     const deadline = Date.now() + timeoutMs;
 
     while (Date.now() < deadline) {
-      const probe: { status: AgentTaskView["status"] } = await mcpCtx.ctx.runQuery(
+      // `awaitReady` covers both a single task leaving the human's hands and a
+      // multi-item task reaching a full pass while staying open (ADR-0002).
+      const probe: { awaitReady: boolean } = await mcpCtx.ctx.runQuery(
         internal.tasks.statusForAgent,
         {
           userId: mcpCtx.userId,
           taskId: input.task_id,
         },
       );
-      if (isResolved(probe.status)) {
+      if (probe.awaitReady) {
         const task: AgentTaskView = await mcpCtx.ctx.runMutation(internal.tasks.consumeForAgent, {
           userId: mcpCtx.userId,
           tokenId: mcpCtx.tokenId,

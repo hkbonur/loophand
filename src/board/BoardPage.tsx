@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
-import { GearIcon } from "@phosphor-icons/react";
+import { GearIcon, ClockIcon } from "@phosphor-icons/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Spinner } from "../ui/spinner";
@@ -114,13 +114,22 @@ function BoardInner() {
             onCreate={onCreateProject}
           />
         </div>
-        <Link
-          to="/settings/agents"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground no-underline transition hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-        >
-          <GearIcon className="h-4 w-4" />
-          Agents
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            to="/settings/schedules"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground no-underline transition hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          >
+            <ClockIcon className="h-4 w-4" />
+            Schedules
+          </Link>
+          <Link
+            to="/settings/agents"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-4 py-2 text-sm font-semibold text-foreground no-underline transition hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          >
+            <GearIcon className="h-4 w-4" />
+            Agents
+          </Link>
+        </div>
       </div>
 
       <PushPrompt />

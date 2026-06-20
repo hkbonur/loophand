@@ -45,7 +45,7 @@ export function ConnectSnippet(props: Props) {
         type="button"
         onClick={copy}
         aria-label="Copy snippet"
-        className="absolute right-3 top-3 rounded-lg border border-border bg-card p-1.5 text-muted-foreground shadow-sm transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground shadow-sm transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
       >
         {copied ? <CheckIcon className="h-3.5 w-3.5" /> : <CopyIcon className="h-3.5 w-3.5" />}
       </button>

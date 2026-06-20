@@ -39,7 +39,7 @@ export function PushPrompt() {
     <div className="mb-6 flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-2.5 text-sm">
       <BellIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
       <span className="text-muted-foreground">
-        Get notified when an agent needs you — even with the tab closed.
+        Get notified when an agent needs you, even with the tab closed.
       </span>
       <Button size="sm" disabled={push.busy} onClick={push.enable} className="ml-auto shrink-0">
         {push.busy ? <Spinner /> : "Enable notifications"}

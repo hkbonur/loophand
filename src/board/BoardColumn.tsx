@@ -22,7 +22,7 @@ export function BoardColumn(props: Props) {
         <span
           className={cn(
             "rounded-full bg-card px-2 py-0.5 text-xs font-medium tabular-nums",
-            count === 0 ? "text-muted-foreground/50" : "text-muted-foreground",
+            count === 0 ? "text-muted-foreground/70" : "text-muted-foreground",
           )}
         >
           {count}
@@ -35,7 +35,7 @@ export function BoardColumn(props: Props) {
             <CardSkeleton />
           </>
         ) : count === 0 ? (
-          <p className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground/70">
+          <p className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
             Nothing here yet
           </p>
         ) : (

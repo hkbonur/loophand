@@ -7,6 +7,7 @@ import { listTasksTool } from "./listTasks";
 import { listProjectsTool } from "./listProjects";
 import { createProjectTool } from "./createProject";
 import { uploadScreenshotTool } from "./uploadScreenshot";
+import { fetchFileTool } from "./fetchFile";
 
 export const taskTools: McpTool[] = [
   createTaskTool,
@@ -17,4 +18,5 @@ export const taskTools: McpTool[] = [
   listProjectsTool,
   createProjectTool,
   uploadScreenshotTool,
+  fetchFileTool,
 ];

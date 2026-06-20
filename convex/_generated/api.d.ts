@@ -30,6 +30,7 @@ import type * as http_mcp_tools_tasks_awaitTask from "../http/mcp/tools/tasks/aw
 import type * as http_mcp_tools_tasks_cancelTask from "../http/mcp/tools/tasks/cancelTask.js";
 import type * as http_mcp_tools_tasks_createProject from "../http/mcp/tools/tasks/createProject.js";
 import type * as http_mcp_tools_tasks_createTask from "../http/mcp/tools/tasks/createTask.js";
+import type * as http_mcp_tools_tasks_fetchFile from "../http/mcp/tools/tasks/fetchFile.js";
 import type * as http_mcp_tools_tasks_getTask from "../http/mcp/tools/tasks/getTask.js";
 import type * as http_mcp_tools_tasks_index from "../http/mcp/tools/tasks/index.js";
 import type * as http_mcp_tools_tasks_listProjects from "../http/mcp/tools/tasks/listProjects.js";
@@ -87,6 +88,7 @@ declare const fullApi: ApiFromModules<{
   "http/mcp/tools/tasks/cancelTask": typeof http_mcp_tools_tasks_cancelTask;
   "http/mcp/tools/tasks/createProject": typeof http_mcp_tools_tasks_createProject;
   "http/mcp/tools/tasks/createTask": typeof http_mcp_tools_tasks_createTask;
+  "http/mcp/tools/tasks/fetchFile": typeof http_mcp_tools_tasks_fetchFile;
   "http/mcp/tools/tasks/getTask": typeof http_mcp_tools_tasks_getTask;
   "http/mcp/tools/tasks/index": typeof http_mcp_tools_tasks_index;
   "http/mcp/tools/tasks/listProjects": typeof http_mcp_tools_tasks_listProjects;

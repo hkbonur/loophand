@@ -120,10 +120,15 @@ export default defineSchema({
     // reference, not the file, so one blob can have many owners.
     ownerType: v.union(v.literal("task"), v.literal("taskItem")),
     ownerId: v.string(),
+    // Stable, human-meaningful output name (e.g. "item-1.pdf") an agent fetches
+    // by via fetch_file(task_id, name). Undefined for inputs (a screenshot the
+    // agent already holds the id for). See docs/adr/0001.
+    name: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_file", ["fileId"])
-    .index("by_owner", ["ownerType", "ownerId"]),
+    .index("by_owner", ["ownerType", "ownerId"])
+    .index("by_owner_name", ["ownerType", "ownerId", "name"]),
 
   pendingR2Uploads: defineTable({
     r2Key: v.string(),

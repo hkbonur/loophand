@@ -9,6 +9,7 @@ import { Empty } from "../ui/empty";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { BoardColumn } from "./BoardColumn";
 import { BoardFilters } from "./BoardFilters";
+import { BlockedLane } from "./BlockedLane";
 import { CardDialog } from "./CardDialog";
 import { ConnectSnippet } from "./ConnectSnippet";
 import { COLUMNS, type TaskView } from "./types";
@@ -149,6 +150,12 @@ function BoardInner() {
               />
             </div>
           ) : null}
+          <BlockedLane
+            tasks={(visibleTasks ?? []).filter((task: TaskView) => task.status === "blocked")}
+            now={now}
+            agents={agents}
+            onOpen={setSelectedTaskId}
+          />
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             {COLUMNS.map((column) => (
               <BoardColumn

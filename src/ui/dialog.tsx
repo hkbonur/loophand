@@ -45,12 +45,7 @@ function DialogModal(props: Props) {
 
   const screen = props.size === "screen";
   return (
-    <div
-      className={cn(
-        "fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#0a0a0a]/55 backdrop-blur-sm",
-        screen ? "p-0" : "p-4 sm:p-8",
-      )}
-    >
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#0a0a0a]/55 p-4 backdrop-blur-sm sm:p-8">
       <div className="absolute inset-0" onClick={props.onClose} aria-hidden="true" />
       <div
         ref={panelRef}
@@ -59,10 +54,10 @@ function DialogModal(props: Props) {
         aria-modal="true"
         aria-label={props.title}
         className={cn(
-          "relative z-10 my-auto flex w-full flex-col border-border bg-card shadow-2xl focus:outline-none motion-safe:animate-[dialog-in_200ms_cubic-bezier(0.22,1,0.36,1)]",
-          screen && "h-dvh max-w-none overflow-hidden rounded-none border-0",
-          props.size === "full" && "h-[calc(100dvh-4rem)] max-w-[1400px] overflow-hidden rounded-3xl border",
-          !props.size || props.size === "default" ? "max-w-3xl rounded-3xl border" : "",
+          "relative z-10 my-auto flex w-full flex-col rounded-3xl border border-border bg-card shadow-2xl focus:outline-none motion-safe:animate-[dialog-in_200ms_cubic-bezier(0.22,1,0.36,1)]",
+          screen && "h-[calc(100dvh-2rem)] max-w-none overflow-hidden sm:h-[calc(100dvh-4rem)]",
+          props.size === "full" && "h-[calc(100dvh-4rem)] max-w-[1400px] overflow-hidden",
+          (!props.size || props.size === "default") && "max-w-3xl",
           props.className,
         )}
       >
@@ -70,9 +65,12 @@ function DialogModal(props: Props) {
           type="button"
           onClick={props.onClose}
           aria-label="Close"
-          className="absolute right-5 top-5 z-10 rounded-full p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          className={cn(
+            "absolute right-4 top-4 z-30 rounded-full border border-border bg-card text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+            screen ? "p-2" : "p-1.5",
+          )}
         >
-          <XIcon className="h-4 w-4" />
+          <XIcon className={screen ? "h-5 w-5" : "h-4 w-4"} />
         </button>
         {props.children}
       </div>

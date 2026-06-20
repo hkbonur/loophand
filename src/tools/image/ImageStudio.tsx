@@ -9,7 +9,6 @@ import {
   ArrowUUpLeftIcon,
   DownloadSimpleIcon,
   CheckIcon,
-  XIcon,
   PencilSimpleIcon,
   CursorIcon,
   SquareIcon,
@@ -65,7 +64,6 @@ type Box = { left: number; top: number; w: number; h: number };
 interface Props {
   task: TaskView;
   onResolved: () => void;
-  onClose: () => void;
   onOpenTask?: (taskId: Id<"tasks">) => void;
 }
 
@@ -139,10 +137,21 @@ export function ImageStudio(props: Props) {
   const [viewport, setViewport] = React.useState<Size>({ width: 0, height: 0 });
   const [zoom, setZoom] = React.useState(1);
   const [offset, setOffset] = React.useState({ x: 0, y: 0 });
+  // Live on-screen size while the resize handles are being dragged (display px,
+  // centered). null = not mid-resize.
+  const [resizeDraft, setResizeDraft] = React.useState<Size | null>(null);
   const resetView = React.useCallback(() => {
     setZoom(1);
     setOffset({ x: 0, y: 0 });
   }, []);
+
+  // Resize is done at 1:1 zoom, centered, so the live canvas size maps cleanly to
+  // the drag.
+  const startResize = () => {
+    setEditTool("resize");
+    setResizeDraft(null);
+    resetView();
+  };
 
   const ann = useAnnotations();
   const [rawSelectedId, setRawSelectedId] = React.useState<string | null>(null);
@@ -191,17 +200,24 @@ export function ImageStudio(props: Props) {
   const push = (op: ImageOp) => setOps((cur) => [...cur, op]);
   const undoLast = () => setOps((cur) => cur.slice(0, -1));
 
-  // The artifact's on-screen box (viewport-local), derived from its fitted size,
-  // the zoom, and the pan offset. Used to place the crop / resize overlays.
+  const resizing = editTool === "resize";
+  // The artifact's on-screen size. While resizing it follows the live drag
+  // (centered, 1:1 zoom); otherwise it's the fitted size times zoom.
+  const onScreen: Size | null = !dims
+    ? null
+    : resizing && resizeDraft
+      ? resizeDraft
+      : { width: dims.width * fit * zoom, height: dims.height * fit * zoom };
+
+  // The artifact's on-screen box (viewport-local), used to place the crop / resize
+  // overlays and to size the canvas.
   const displayBox = (): Box | null => {
-    if (!dims) return null;
-    const w = dims.width * fit * zoom;
-    const h = dims.height * fit * zoom;
+    if (!onScreen) return null;
     return {
-      left: viewport.width / 2 + offset.x - w / 2,
-      top: viewport.height / 2 + offset.y - h / 2,
-      w,
-      h,
+      left: viewport.width / 2 + offset.x - onScreen.width / 2,
+      top: viewport.height / 2 + offset.y - onScreen.height / 2,
+      w: onScreen.width,
+      h: onScreen.height,
     };
   };
 
@@ -224,16 +240,19 @@ export function ImageStudio(props: Props) {
     resetView();
   };
 
-  // Commit a drag-handle resize: the overlay reports the new on-screen box, which
-  // maps back to working-canvas pixels.
-  const applyResize = (box: Box) => {
-    const scale = fit * zoom;
-    const width = Math.round(box.w / scale);
-    const height = Math.round(box.h / scale);
-    if (width < 1 || height < 1) return;
-    push({ kind: "resize", width, height });
+  // Commit the live resize: the on-screen size (at 1:1 zoom) maps to working-canvas
+  // pixels. Compensate zoom so the artifact keeps the size the human dragged it to
+  // (otherwise the re-fit would snap it back and hide the change).
+  const applyResize = (size: Size) => {
+    const width = Math.round(size.width / fit);
+    const height = Math.round(size.height / fit);
+    setResizeDraft(null);
     setEditTool("pan");
-    resetView();
+    if (width < 1 || height < 1) return;
+    const newFit = fitScale(viewport, { width, height });
+    push({ kind: "resize", width, height });
+    setOffset({ x: 0, y: 0 });
+    setZoom(clampZoom(fit / newFit));
   };
 
   const download = () => {
@@ -283,6 +302,22 @@ export function ImageStudio(props: Props) {
   };
 
   const box = mode === "edit" ? displayBox() : null;
+  // Canvas CSS size (before the group's zoom transform). While resizing, zoom is 1
+  // and this is the live draft size; otherwise it's the fitted size.
+  const canvasSize: Size | null = !dims
+    ? null
+    : resizing && resizeDraft
+      ? resizeDraft
+      : { width: dims.width * fit, height: dims.height * fit };
+
+  // Annotate paints the source image (its own Konva surface). Fit that to the
+  // viewport too, so switching to Annotate doesn't shrink the artifact.
+  const sourceDims = source.image
+    ? { width: source.image.naturalWidth, height: source.image.naturalHeight }
+    : null;
+  const annotateWidth = sourceDims
+    ? Math.round(sourceDims.width * fitScale(viewport, sourceDims))
+    : ANNOTATE_WIDTH;
 
   return (
     <div className="flex h-full w-full bg-background text-foreground">
@@ -301,8 +336,11 @@ export function ImageStudio(props: Props) {
           onOffset={setOffset}
           onCrop={applyCrop}
           box={box}
-          onResize={applyResize}
+          canvasSize={canvasSize}
+          onResizeLive={setResizeDraft}
+          onResizeCommit={applyResize}
           corsUrl={corsUrl}
+          annotateWidth={annotateWidth}
           ann={ann}
           pinLabels={pinLabels}
           selectedId={selectedId}
@@ -316,7 +354,6 @@ export function ImageStudio(props: Props) {
           pending={pending}
           onApprove={() => submit("approve", "")}
           onRequest={(note) => submit("request_changes", note)}
-          onClose={props.onClose}
         />
 
         {mode === "edit" ? (
@@ -335,6 +372,7 @@ export function ImageStudio(props: Props) {
                 ops={ops}
                 editTool={editTool}
                 onSetTool={setEditTool}
+                onStartResize={startResize}
                 onPush={push}
                 onUndo={undoLast}
                 outputType={outputType}
@@ -385,8 +423,11 @@ interface ViewportProps {
   onOffset: (next: { x: number; y: number }) => void;
   onCrop: (local: { x0: number; y0: number; x1: number; y1: number }) => void;
   box: Box | null;
-  onResize: (box: Box) => void;
+  canvasSize: Size | null;
+  onResizeLive: (size: Size) => void;
+  onResizeCommit: (size: Size) => void;
   corsUrl: string | null;
+  annotateWidth: number;
   ann: ReturnType<typeof useAnnotations>;
   pinLabels: Record<string, number>;
   selectedId: string | null;
@@ -477,8 +518,8 @@ function CanvasViewport(props: ViewportProps) {
           ref={props.canvasRef}
           className={cn("rounded shadow-lg ring-1 ring-border", !props.source.image && "hidden")}
           style={
-            props.dims
-              ? { width: props.dims.width * props.fit, height: props.dims.height * props.fit }
+            props.canvasSize
+              ? { width: props.canvasSize.width, height: props.canvasSize.height }
               : undefined
           }
         />
@@ -489,7 +530,8 @@ function CanvasViewport(props: ViewportProps) {
           <React.Suspense fallback={<LoadingArtifact />}>
             <AnnotationCanvas
               imageUrl={props.corsUrl ?? ""}
-              displayWidth={ANNOTATE_WIDTH}
+              displayWidth={props.annotateWidth}
+              upscale
               viewport={ANNOTATE_VIEWPORT}
               marks={props.ann.marks}
               pinLabels={props.pinLabels}
@@ -514,8 +556,14 @@ function CanvasViewport(props: ViewportProps) {
         />
       ) : null}
 
-      {resizing && props.box && props.dims ? (
-        <ResizeOverlay box={props.box} scale={props.fit * props.zoom} onResize={props.onResize} />
+      {resizing && props.box ? (
+        <ResizeOverlay
+          box={props.box}
+          fit={props.fit}
+          viewportRef={props.viewportRef}
+          onLive={props.onResizeLive}
+          onCommit={props.onResizeCommit}
+        />
       ) : null}
 
       {props.source.error ? (
@@ -543,55 +591,61 @@ const HANDLES: { key: string; l: boolean; t: boolean; r: boolean; b: boolean; cu
   { key: "w", l: true, t: false, r: false, b: false, cursor: "ew-resize" },
 ];
 
-// Eight drag handles around the artifact. Dragging a handle resizes from the
-// opposite edge(s); the committed box maps back to canvas pixels by the parent.
-function ResizeOverlay(props: { box: Box; scale: number; onResize: (box: Box) => void }) {
-  const [draft, setDraft] = React.useState<Box | null>(null);
-  const dragRef = React.useRef<{
-    handle: (typeof HANDLES)[number];
-    x: number;
-    y: number;
-    box: Box;
-  } | null>(null);
-  const cur = draft ?? props.box;
+// Eight drag handles around the artifact. The artifact resizes LIVE as a handle
+// is dragged (center-anchored, so it scales about its middle and the canvas
+// tracks the box), and commits on release. `box` reflects the current live size
+// (the parent feeds the draft back through it).
+function ResizeOverlay(props: {
+  box: Box;
+  fit: number;
+  viewportRef: React.RefObject<HTMLDivElement | null>;
+  onLive: (size: Size) => void;
+  onCommit: (size: Size) => void;
+}) {
+  const cx = props.box.left + props.box.w / 2;
+  const cy = props.box.top + props.box.h / 2;
+  const dragRef = React.useRef<{ handle: (typeof HANDLES)[number]; w: number; h: number } | null>(
+    null,
+  );
+
+  const local = (e: React.PointerEvent) => {
+    const vp = props.viewportRef.current?.getBoundingClientRect();
+    return { x: e.clientX - (vp?.left ?? 0), y: e.clientY - (vp?.top ?? 0) };
+  };
 
   const onDown = (handle: (typeof HANDLES)[number], e: React.PointerEvent) => {
     e.stopPropagation();
-    dragRef.current = { handle, x: e.clientX, y: e.clientY, box: props.box };
+    dragRef.current = { handle, w: props.box.w, h: props.box.h };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const onMove = (e: React.PointerEvent) => {
     const drag = dragRef.current;
     if (!drag) return;
-    const dx = e.clientX - drag.x;
-    const dy = e.clientY - drag.y;
-    const { left, top, w, h } = drag.box;
-    let l = left;
-    let t = top;
-    let r = left + w;
-    let b = top + h;
-    if (drag.handle.l) l = Math.min(left + dx, r - MIN_HANDLE_PX);
-    if (drag.handle.r) r = Math.max(r + dx, left + MIN_HANDLE_PX);
-    if (drag.handle.t) t = Math.min(top + dy, b - MIN_HANDLE_PX);
-    if (drag.handle.b) b = Math.max(b + dy, top + MIN_HANDLE_PX);
-    setDraft({ left: l, top: t, w: r - l, h: b - t });
+    const p = local(e);
+    let w = drag.w;
+    let h = drag.h;
+    if (drag.handle.l || drag.handle.r) w = Math.max(MIN_HANDLE_PX, 2 * Math.abs(p.x - cx));
+    if (drag.handle.t || drag.handle.b) h = Math.max(MIN_HANDLE_PX, 2 * Math.abs(p.y - cy));
+    drag.w = w;
+    drag.h = h;
+    props.onLive({ width: w, height: h });
   };
 
   const onUp = () => {
-    if (dragRef.current && draft) props.onResize(draft);
+    const drag = dragRef.current;
     dragRef.current = null;
-    setDraft(null);
+    if (drag) props.onCommit({ width: drag.w, height: drag.h });
   };
 
   return (
     <>
       <div
         className="pointer-events-none absolute rounded border-2 border-dashed border-primary"
-        style={{ left: cur.left, top: cur.top, width: cur.w, height: cur.h }}
+        style={{ left: props.box.left, top: props.box.top, width: props.box.w, height: props.box.h }}
       >
         <span className="absolute -top-7 left-0 rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold tabular-nums text-primary-foreground">
-          {Math.round(cur.w / props.scale)}×{Math.round(cur.h / props.scale)}
+          {Math.round(props.box.w / props.fit)}×{Math.round(props.box.h / props.fit)}
         </span>
       </div>
       {HANDLES.map((handle) => (
@@ -605,8 +659,8 @@ function ResizeOverlay(props: { box: Box; scale: number; onResize: (box: Box) =>
           onPointerCancel={onUp}
           className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-sm border-2 border-card bg-primary shadow"
           style={{
-            left: cur.left + (handle.l ? 0 : handle.r ? cur.w : cur.w / 2),
-            top: cur.top + (handle.t ? 0 : handle.b ? cur.h : cur.h / 2),
+            left: props.box.left + (handle.l ? 0 : handle.r ? props.box.w : props.box.w / 2),
+            top: props.box.top + (handle.t ? 0 : handle.b ? props.box.h : props.box.h / 2),
             cursor: handle.cursor,
           }}
         />
@@ -660,7 +714,6 @@ function ResolveCluster(props: {
   pending: boolean;
   onApprove: () => void;
   onRequest: (note: string) => void;
-  onClose: () => void;
 }) {
   const [open, setOpen] = React.useState(false);
   const [note, setNote] = React.useState("");
@@ -684,14 +737,6 @@ function ResolveCluster(props: {
         >
           {props.pending ? <Spinner /> : <CheckIcon className="h-4 w-4" />}
           Approve
-        </button>
-        <button
-          type="button"
-          onClick={props.onClose}
-          className="flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-4 py-2 text-xs font-semibold text-foreground shadow-sm backdrop-blur transition hover:bg-muted"
-        >
-          <XIcon className="h-4 w-4" />
-          Close
         </button>
       </div>
       {open ? (
@@ -802,6 +847,7 @@ function EditToolbar(props: {
   ops: ImageOp[];
   editTool: EditTool;
   onSetTool: (t: EditTool) => void;
+  onStartResize: () => void;
   onPush: (op: ImageOp) => void;
   onUndo: () => void;
   outputType: OutputType;
@@ -822,7 +868,7 @@ function EditToolbar(props: {
       <ToolButton
         label="Resize — drag the handles"
         active={props.editTool === "resize"}
-        onClick={toggle("resize")}
+        onClick={props.editTool === "resize" ? () => props.onSetTool("pan") : props.onStartResize}
       >
         <ArrowsOutIcon className="h-4 w-4" />
       </ToolButton>
@@ -850,21 +896,23 @@ function EditToolbar(props: {
 
       <Divider />
 
-      <select
-        value={props.outputType}
-        onChange={(e) => props.onOutputType(e.target.value as OutputType)}
-        aria-label="Export format"
-        className="h-9 rounded-lg border border-border bg-background px-2 text-xs text-foreground"
-      >
-        {OUTPUT_TYPES.map((t) => (
-          <option key={t} value={t}>
-            {extensionFor(t).toUpperCase()}
-          </option>
-        ))}
-      </select>
-      <ToolButton label="Download" disabled={!props.canDownload} onClick={props.onDownload}>
-        <DownloadSimpleIcon className="h-4 w-4" />
-      </ToolButton>
+      <span className="flex items-center gap-1.5">
+        <select
+          value={props.outputType}
+          onChange={(e) => props.onOutputType(e.target.value as OutputType)}
+          aria-label="Export format"
+          className="h-9 min-w-[5rem] cursor-pointer rounded-lg border border-border bg-background pl-3 pr-2 text-xs font-medium text-foreground"
+        >
+          {OUTPUT_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {extensionFor(t).toUpperCase()}
+            </option>
+          ))}
+        </select>
+        <ToolButton label="Download" disabled={!props.canDownload} onClick={props.onDownload}>
+          <DownloadSimpleIcon className="h-4 w-4" />
+        </ToolButton>
+      </span>
 
       <Divider />
 

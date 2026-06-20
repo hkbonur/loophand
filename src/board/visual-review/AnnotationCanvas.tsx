@@ -17,6 +17,8 @@ interface Props {
   imageUrl: string;
   /** Width to render the screenshot at (the viewport frame); height follows the aspect ratio. */
   displayWidth: number;
+  /** Allow rendering larger than 1:1 to fill displayWidth (the image studio fits small artifacts). */
+  upscale?: boolean;
   viewport: Viewport;
   marks: Mark[];
   /** Derived pin display numbers, keyed by mark id. */
@@ -58,7 +60,9 @@ export function AnnotationCanvas(props: Props) {
 
   const naturalWidth = image.naturalWidth;
   const naturalHeight = image.naturalHeight;
-  const scale = fitScale(naturalWidth, props.displayWidth);
+  const scale = props.upscale
+    ? props.displayWidth / naturalWidth
+    : fitScale(naturalWidth, props.displayWidth);
   const stageWidth = naturalWidth * scale;
   const stageHeight = naturalHeight * scale;
   const stroke = 3.5 / scale; // keep a constant on-screen width under the scaled Layer

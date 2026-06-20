@@ -53,12 +53,7 @@ export function CardDialog(props: Props) {
       ) : task === null ? (
         <div className="p-8 text-sm text-muted-foreground">This task is no longer available.</div>
       ) : fullTakeover ? (
-        <ImageStudio
-          task={task}
-          onResolved={props.onClose}
-          onClose={props.onClose}
-          onOpenTask={props.onOpenTask}
-        />
+        <ImageStudio task={task} onResolved={props.onClose} onOpenTask={props.onOpenTask} />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
           {stale ? <StaleBanner message={stale} /> : null}

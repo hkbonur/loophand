@@ -31,12 +31,13 @@ interface Props {
 // canvas — the same skin the PDF / HTML studios use.
 export function ImageDock(props: Props) {
   return (
-    <aside className="flex w-full flex-none flex-col border-l border-border bg-card sm:w-[360px]">
-      <header className="flex h-14 flex-none items-center border-b border-border px-4 pr-12">
-        <h2 className="text-sm font-bold text-foreground">Comments &amp; marks</h2>
-      </header>
+    <aside className="flex w-full flex-none py-4 pl-2 pr-16 sm:w-[24rem]">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
+        <header className="flex h-12 flex-none items-center border-b border-border px-4">
+          <h2 className="text-sm font-bold text-foreground">Comments &amp; marks</h2>
+        </header>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
         {props.marks.length > 0 ? (
           <MarksList
             marks={props.marks}
@@ -49,9 +50,10 @@ export function ImageDock(props: Props) {
           />
         ) : null}
 
-        <DockComments taskId={props.task._id} comments={props.comments} />
+          <DockComments taskId={props.task._id} comments={props.comments} />
 
-        <TaskDetails task={props.task} onOpenTask={props.onOpenTask} />
+          <TaskDetails task={props.task} onOpenTask={props.onOpenTask} />
+        </div>
       </div>
     </aside>
   );

@@ -586,3 +586,60 @@ describe("tasks.deps view + depCount", () => {
     expect((await asOwner.query(api.tasks.get, { taskId: a.task_id }))?.depCount).toBe(0);
   });
 });
+
+describe("tasks.reopen (undo)", () => {
+  async function openTask(t: ReturnType<typeof convexTest>, ids: { userId: Id<"users">; tokenId: Id<"apiTokens">; projectId: Id<"projects"> }) {
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId: ids.userId,
+      tokenId: ids.tokenId,
+      project: ids.projectId,
+      type: "approval",
+      title: "T",
+      instructions: "i",
+    });
+    return task.task_id;
+  }
+
+  test("reverts a just-approved task back to open", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    const taskId = await openTask(t, ids);
+
+    await asOwner.mutation(api.tasks.resolve, { taskId, action: "approve", revision: 0 });
+    await asOwner.mutation(api.tasks.reopen, { taskId });
+
+    const row = await asOwner.query(api.tasks.get, { taskId });
+    expect(row?.status).toBe("open");
+    expect(row?.outcome).toBeNull();
+  });
+
+  test("refuses once the agent has consumed the result", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    const taskId = await openTask(t, ids);
+
+    await asOwner.mutation(api.tasks.resolve, { taskId, action: "approve", revision: 0 });
+    await t.mutation(internal.tasks.consumeForAgent, {
+      userId: ids.userId,
+      tokenId: ids.tokenId,
+      taskId,
+    });
+
+    await expect(asOwner.mutation(api.tasks.reopen, { taskId })).rejects.toThrow();
+  });
+
+  test("rejects undo from a non-owner", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    await setupOwner(t, "stranger@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    const taskId = await openTask(t, ids);
+    await asOwner.mutation(api.tasks.resolve, { taskId, action: "approve", revision: 0 });
+
+    await expect(
+      t.withIdentity({ email: "stranger@example.com" }).mutation(api.tasks.reopen, { taskId }),
+    ).rejects.toThrow();
+  });
+});

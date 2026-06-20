@@ -18,6 +18,7 @@ interface Props {
 
 export function ApprovalPanel(props: Props) {
   const resolve = useMutation(api.tasks.resolve);
+  const reopen = useMutation(api.tasks.reopen);
   const [comment, setComment] = React.useState("");
   const [pending, setPending] = React.useState<Action | null>(null);
 
@@ -38,12 +39,30 @@ export function ApprovalPanel(props: Props) {
           comment: comment.trim() || undefined,
           revision: task.revision,
         });
-        toast.success(
+        const message =
           action === "approve"
             ? "Approved — sent back to the agent."
             : action === "request_changes"
               ? "Changes requested."
-              : "Task cancelled.",
+              : "Task cancelled.";
+        // Cancel sets the task to done (not awaiting_agent), so it can't be undone.
+        const undoable = action !== "cancel";
+        toast.success(
+          message,
+          undoable
+            ? {
+                action: {
+                  label: "Undo",
+                  onClick: () => {
+                    void reopen({ taskId: task._id })
+                      .then(() => toast.success("Reopened."))
+                      .catch((error) =>
+                        toast.error(error instanceof Error ? error.message : "Could not undo."),
+                      );
+                  },
+                },
+              }
+            : undefined,
         );
         onResolved();
       } catch (error) {
@@ -51,7 +70,7 @@ export function ApprovalPanel(props: Props) {
         setPending(null);
       }
     },
-    [resolve, task._id, task.revision, comment, onResolved],
+    [resolve, reopen, task._id, task.revision, comment, onResolved],
   );
 
   return (

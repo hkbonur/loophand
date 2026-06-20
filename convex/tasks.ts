@@ -692,6 +692,54 @@ export const resolve = mutation({
   },
 });
 
+// Undo a just-made resolution while it is still recoverable — i.e. before the
+// agent has picked the result up (status still `awaiting_agent`). Reverts the
+// card to `open`, clearing the outcome/result and bumping the revision so a
+// late resolve can't race it. Refused once the agent has consumed it, or when
+// the resolution released dependents (that DAG cascade isn't reversed here).
+export const reopen = mutation({
+  args: { taskId: v.id("tasks") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const task = await assertOwnedTask(ctx, args.taskId, userId);
+    if (task.status !== "awaiting_agent") {
+      throw new ConvexError({
+        code: "CONFLICT",
+        message: "Too late to undo — the agent has already picked this up.",
+      });
+    }
+    const dependent = await ctx.db
+      .query("taskDeps")
+      .withIndex("by_dependsOn", (q) => q.eq("dependsOnTaskId", args.taskId))
+      .first();
+    if (dependent) {
+      throw new ConvexError({
+        code: "CONFLICT",
+        message: "Can't undo — another task depends on this one.",
+      });
+    }
+    const now = Date.now();
+    await ctx.db.patch(args.taskId, {
+      status: "open",
+      outcome: undefined,
+      result: undefined,
+      revision: task.revision + 1,
+      updatedAt: now,
+    });
+    await ctx.db.insert("taskAudit", {
+      taskId: args.taskId,
+      userId,
+      action: "reopen",
+      fromStatus: "awaiting_agent",
+      toStatus: "open",
+      revision: task.revision + 1,
+      createdAt: now,
+    });
+    return null;
+  },
+});
+
 // Human comment on a task — the round-trip reducer's write side. The agent reads
 // these back (plus the derived `guidance`) through get_task, so a human can
 // steer the agent without cancelling and re-creating the task.

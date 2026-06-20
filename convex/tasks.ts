@@ -23,6 +23,8 @@ import {
 import { isTaskType, TASK_TYPES, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
 import { assertDocItemData } from "./lib/render";
 import { normalizeTags } from "./lib/tags";
+import { rateLimiter } from "./rateLimit";
+import { enforceLimit } from "./lib/rateLimitGuard";
 
 const statusValidator = v.union(...TASK_STATUSES.map((s) => v.literal(s)));
 const outcomeValidator = v.union(...TASK_OUTCOMES.map((o) => v.literal(o)));
@@ -313,6 +315,13 @@ export const createForAgent = internalMutation({
         .first();
       if (existing) return { task: toAgentView(existing), reused: true };
     }
+
+    // Per-agent create backstop (fail-open). Charged only for a real create —
+    // after the idempotency short-circuit, so retries don't burn the budget.
+    await enforceLimit(
+      () => rateLimiter.limit(ctx, "createTask", { key: args.tokenId }),
+      "create_task",
+    );
 
     const projectId = await resolveProjectRef(ctx, args.userId, args.project);
 
@@ -650,7 +659,16 @@ export const close = mutation({
         message: `Only a resumed task can be closed (was "${task.status}").`,
       });
     }
-    await ctx.db.patch(args.taskId, { status: "done", updatedAt: Date.now() });
+    const now = Date.now();
+    await ctx.db.patch(args.taskId, { status: "done", updatedAt: now });
+    await ctx.db.insert("taskAudit", {
+      taskId: args.taskId,
+      userId,
+      action: "close",
+      fromStatus: "resumed",
+      toStatus: "done",
+      createdAt: now,
+    });
     return null;
   },
 });

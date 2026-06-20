@@ -255,3 +255,37 @@ describe("tasks.setTags", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("tasks.close", () => {
+  test("writes a taskAudit row when a resumed task is closed", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId } = await setupOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId,
+      tokenId,
+      type: "approval",
+      title: "A",
+      instructions: "A",
+    });
+    await asOwner.mutation(api.tasks.resolve, {
+      taskId: task.task_id,
+      action: "approve",
+      revision: 0,
+    });
+    await t.mutation(internal.tasks.consumeForAgent, { userId, tokenId, taskId: task.task_id });
+    await asOwner.mutation(api.tasks.close, { taskId: task.task_id });
+
+    const audits = await t.run((ctx) =>
+      ctx.db
+        .query("taskAudit")
+        .withIndex("by_task", (q) => q.eq("taskId", task.task_id))
+        .collect(),
+    );
+    const closeAudit = audits.find((a) => a.action === "close");
+    expect(closeAudit).toBeTruthy();
+    expect(closeAudit?.fromStatus).toBe("resumed");
+    expect(closeAudit?.toStatus).toBe("done");
+  });
+});

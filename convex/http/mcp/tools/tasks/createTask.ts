@@ -52,6 +52,18 @@ const schema = z.object({
     .describe(
       "Multi-item review: one rail item per entry, all on one card. Required for doc_review (one render spec per document). Mutually exclusive with tool_payload.",
     ),
+  depends_on: z
+    .array(z.string())
+    .optional()
+    .describe(
+      "Task ids (same project) this one waits on. The card stays blocked until every dep is approved; if any dep fails, this task fails too. Fan out children, then a parent with depends_on, and await_task only the parent.",
+    ),
+  not_before: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("Unix epoch ms; the task stays blocked until this time, then opens."),
   idempotency_key: z
     .string()
     .optional()
@@ -96,6 +108,8 @@ export const createTaskTool = defineTool({
             }
           : undefined,
         items: input.items,
+        dependsOn: input.depends_on,
+        notBefore: input.not_before,
         idempotencyKey: input.idempotency_key,
         ttlSeconds: input.ttl_seconds,
       },

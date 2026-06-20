@@ -26,3 +26,12 @@ export function isAgentDark(lastUsedAt: number | undefined, now: number): boolea
   if (lastUsedAt === undefined) return false;
   return now - lastUsedAt > DARK_AFTER_MS;
 }
+
+// Up-to-two-letter monogram for an agent avatar: initials of the first two
+// words, or the first two letters of a single-word name.
+export function agentInitials(name: string): string {
+  const words = name.split(/[^A-Za-z0-9]+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  const letters = words.length === 1 ? words[0].slice(0, 2) : words[0][0] + words[1][0];
+  return letters.toUpperCase();
+}

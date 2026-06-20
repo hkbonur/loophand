@@ -11,6 +11,8 @@ import { VisualReview } from "./visual-review/VisualReview";
 import { MultiItemReview } from "./item-rail/MultiItemReview";
 import { SectionLabel } from "./SectionLabel";
 import { staleNotice } from "./staleNotice";
+import { AgentChip } from "./AgentChip";
+import { useAgents } from "./useAgents";
 import type { TaskView } from "./types";
 
 interface Props {
@@ -77,6 +79,12 @@ function StaleBanner(props: { message: string }) {
 
 function TaskDetails(props: { task: TaskView }) {
   const task = props.task;
+  const agents = useAgents();
+  const now = Date.now();
+  // undefined = no attribution recorded (hide the row); null = the token is gone
+  // (show "Unknown agent").
+  const creator = task.createdByTokenId ? (agents.get(task.createdByTokenId) ?? null) : undefined;
+  const resumer = task.resumedByTokenId ? (agents.get(task.resumedByTokenId) ?? null) : undefined;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -88,6 +96,16 @@ function TaskDetails(props: { task: TaskView }) {
         ))}
       </div>
       <h2 className="text-lg font-bold text-foreground">{task.title}</h2>
+      {creator !== undefined || resumer !== undefined ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          {creator !== undefined ? (
+            <AgentChip agent={creator} now={now} caption="raised by" />
+          ) : null}
+          {task.status === "resumed" && resumer !== undefined ? (
+            <AgentChip agent={resumer} now={now} caption="resumed by" />
+          ) : null}
+        </div>
+      ) : null}
       <div>
         <SectionLabel>Instructions</SectionLabel>
         <p className="whitespace-pre-wrap text-sm text-foreground">{task.instructions}</p>

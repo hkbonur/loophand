@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { lastSeenLabel, isAgentDark, DARK_AFTER_MS } from "./agentActivity";
+import { lastSeenLabel, isAgentDark, agentInitials, DARK_AFTER_MS } from "./agentActivity";
 
 const NOW = 1_000_000_000_000;
 const MIN = 60_000;
@@ -31,5 +31,21 @@ describe("isAgentDark", () => {
 
   test("a never-used token is not flagged dark", () => {
     expect(isAgentDark(undefined, NOW)).toBe(false);
+  });
+});
+
+describe("agentInitials", () => {
+  test("takes the first letter of the first two words", () => {
+    expect(agentInitials("Claude Code Worker")).toBe("CC");
+    expect(agentInitials("claude-code")).toBe("CC");
+  });
+
+  test("takes the first two letters of a single-word name", () => {
+    expect(agentInitials("laptop")).toBe("LA");
+  });
+
+  test("falls back to a placeholder for an empty name", () => {
+    expect(agentInitials("")).toBe("?");
+    expect(agentInitials("   ")).toBe("?");
   });
 });

@@ -3,6 +3,7 @@ import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { outcomeBadge, relativeAge } from "./format";
 import { AgentChip } from "./AgentChip";
+import { TaskCardMenu } from "./TaskCardMenu";
 import type { AgentDirectory } from "./useAgents";
 import type { TaskView } from "./types";
 
@@ -30,12 +31,15 @@ export function TaskCard(props: Props) {
         <h4 className="line-clamp-2 text-sm font-semibold leading-snug text-foreground">
           {task.title}
         </h4>
-        {waitingOnYou ? (
-          <span className="mt-1 flex shrink-0 items-center">
-            <span className="h-2 w-2 rounded-full bg-teal-500 dark:bg-teal-400 motion-safe:animate-pulse" />
-            <span className="sr-only">Waiting on you</span>
-          </span>
-        ) : null}
+        <div className="mt-0.5 flex shrink-0 items-center gap-1">
+          {waitingOnYou ? (
+            <span className="flex items-center">
+              <span className="h-2 w-2 rounded-full bg-teal-500 dark:bg-teal-400 motion-safe:animate-pulse" />
+              <span className="sr-only">Waiting on you</span>
+            </span>
+          ) : null}
+          <TaskCardMenu taskId={task._id} taskTitle={task.title} />
+        </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <Badge tone="info">{task.type}</Badge>

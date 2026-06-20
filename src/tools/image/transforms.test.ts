@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { resizeDimensions, rotatedDimensions, extensionFor, cropRect } from "./transforms";
+import {
+  resizeDimensions,
+  rotatedDimensions,
+  extensionFor,
+  cropRect,
+  containScale,
+} from "./transforms";
 
 describe("resizeDimensions", () => {
   it("preserves aspect ratio", () => {
@@ -24,6 +30,20 @@ describe("extensionFor", () => {
     expect(extensionFor("image/png")).toBe("png");
     expect(extensionFor("image/jpeg")).toBe("jpg");
     expect(extensionFor("image/webp")).toBe("webp");
+  });
+});
+
+describe("containScale", () => {
+  it("upscales a small image to fill the box (contain)", () => {
+    // 120×80 in a 1120×460 box: width ratio 9.33, height ratio 5.75 → min wins.
+    expect(containScale(1120, 460, 120, 80)).toBeCloseTo(5.75, 2);
+  });
+  it("shrinks a large image to fit", () => {
+    expect(containScale(1000, 1000, 4000, 2000)).toBeCloseTo(0.25, 2);
+  });
+  it("clamps to a sane range and guards bad input", () => {
+    expect(containScale(0, 0, 100, 100)).toBe(1);
+    expect(containScale(100, 100, 1, 1)).toBe(32);
   });
 });
 

@@ -9,7 +9,6 @@ import { toast } from "../../ui/toaster";
 import { SectionLabel } from "../../board/SectionLabel";
 import { CommentsSection, type BoardComment } from "../../board/comments/CommentsSection";
 import { DepMiniView } from "../../board/DepMiniView";
-import { ConfirmDeleteTask } from "../../board/ConfirmDeleteTask";
 import type { TaskView } from "../../board/types";
 import type { Mark, Severity } from "../../board/visual-review/types";
 
@@ -23,14 +22,13 @@ interface Props {
   onSetSeverity: (id: string, severity: Severity) => void;
   onUpdateMarkComment: (id: string, comment: string) => void;
   onRemoveMark: (id: string) => void;
-  onDeleted: () => void;
   onOpenTask?: (taskId: Id<"tasks">) => void;
 }
 
 // Always-visible panel down the canvas's right edge: the comment thread with the
 // agent, the marks the human has drawn (severity + per-mark note), and the task's
-// details (acceptance criteria, dependencies, delete). A theme-surface column
-// beside the canvas — the same skin the PDF / HTML studios use.
+// details (acceptance criteria, dependencies). A theme-surface column beside the
+// canvas — the same skin the PDF / HTML studios use.
 export function ImageDock(props: Props) {
   return (
     <aside className="flex w-full flex-none flex-col border-l border-border bg-card sm:w-[360px]">
@@ -53,7 +51,7 @@ export function ImageDock(props: Props) {
 
         <DockComments taskId={props.task._id} comments={props.comments} />
 
-        <TaskDetails task={props.task} onDeleted={props.onDeleted} onOpenTask={props.onOpenTask} />
+        <TaskDetails task={props.task} onOpenTask={props.onOpenTask} />
       </div>
     </aside>
   );
@@ -155,12 +153,12 @@ function DockComments(props: { taskId: Id<"tasks">; comments: BoardComment[] | u
   );
 }
 
-function TaskDetails(props: {
-  task: TaskView;
-  onDeleted: () => void;
-  onOpenTask?: (taskId: Id<"tasks">) => void;
-}) {
+// Acceptance criteria + dependency edges. Deletion lives on the board card's ⋮
+// menu, not in the review dialog. Renders nothing when there's nothing to show.
+function TaskDetails(props: { task: TaskView; onOpenTask?: (taskId: Id<"tasks">) => void }) {
   const deps = useQuery(api.deps.forTask, { taskId: props.task._id });
+  const hasDeps = !!deps && (deps.blockedBy.length > 0 || deps.blocks.length > 0);
+  if (!props.task.acceptanceCriteria && !hasDeps) return null;
   return (
     <div className="mt-auto flex flex-col gap-4 border-t border-border pt-4">
       {props.task.acceptanceCriteria ? (
@@ -171,32 +169,9 @@ function TaskDetails(props: {
           </p>
         </div>
       ) : null}
-      {deps ? (
+      {hasDeps ? (
         <DepMiniView blockedBy={deps.blockedBy} blocks={deps.blocks} onOpen={props.onOpenTask} />
       ) : null}
-      <DeleteAction
-        taskId={props.task._id}
-        taskTitle={props.task.title}
-        onDeleted={props.onDeleted}
-      />
     </div>
   );
-}
-
-function DeleteAction(props: { taskId: Id<"tasks">; taskTitle: string; onDeleted: () => void }) {
-  const deleteTask = useMutation(api.tasks.deleteTask);
-  const [deleting, setDeleting] = React.useState(false);
-
-  const onConfirm = async () => {
-    setDeleting(true);
-    try {
-      await deleteTask({ taskId: props.taskId });
-      props.onDeleted();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not delete the task.");
-      setDeleting(false);
-    }
-  };
-
-  return <ConfirmDeleteTask taskTitle={props.taskTitle} onConfirm={onConfirm} deleting={deleting} />;
 }

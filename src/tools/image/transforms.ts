@@ -6,7 +6,9 @@ export type ImageOp =
   | { kind: "rotate"; deg: 90 | 180 | 270 }
   | { kind: "flip"; axis: "h" | "v" }
   | { kind: "grayscale" }
-  | { kind: "resize"; width: number }
+  // Resize to explicit dimensions (the resize handles set both; callers can pass
+  // aspect-locked values via resizeDimensions).
+  | { kind: "resize"; width: number; height: number }
   // Crop rectangle in the working canvas's pixel space (i.e. after any prior ops).
   | { kind: "crop"; x: number; y: number; width: number; height: number };
 
@@ -64,6 +66,20 @@ export function extensionFor(type: OutputType): string {
   return EXT[type];
 }
 
+// The scale that fits dims inside a usable box (contain), upscaling small images
+// and shrinking large ones, clamped to a sane range. Used so the studio shows the
+// artifact fit-to-viewport at zoom 1.
+export function containScale(
+  usableWidth: number,
+  usableHeight: number,
+  width: number,
+  height: number,
+): number {
+  if (usableWidth <= 0 || usableHeight <= 0 || width <= 0 || height <= 0) return 1;
+  const raw = Math.min(usableWidth / width, usableHeight / height);
+  return Math.min(32, Math.max(0.05, raw));
+}
+
 // Draw `source` (at natural w×h) through one op into a fresh canvas. Browser-only
 // (needs a real 2D context); callers chain these over the working canvas.
 export function applyOp(
@@ -75,10 +91,11 @@ export function applyOp(
   const canvas = document.createElement("canvas");
 
   if (op.kind === "resize") {
-    const d = resizeDimensions(width, height, op.width);
-    canvas.width = d.width;
-    canvas.height = d.height;
-    canvas.getContext("2d")?.drawImage(source, 0, 0, d.width, d.height);
+    const w = Math.max(1, Math.round(op.width));
+    const h = Math.max(1, Math.round(op.height));
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext("2d")?.drawImage(source, 0, 0, w, h);
     return canvas;
   }
 

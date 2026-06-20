@@ -1,10 +1,12 @@
 import React from "react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Dialog } from "../ui/dialog";
 import { Badge } from "../ui/badge";
 import { Spinner } from "../ui/spinner";
+import { toast } from "../ui/toaster";
+import { TagEditor } from "./TagEditor";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { ResultPanel } from "./ResultPanel";
 import { VisualReview } from "./visual-review/VisualReview";
@@ -80,20 +82,21 @@ function StaleBanner(props: { message: string }) {
 function TaskDetails(props: { task: TaskView }) {
   const task = props.task;
   const agents = useAgents();
+  const setTags = useMutation(api.tasks.setTags);
   const now = Date.now();
   // undefined = no attribution recorded (hide the row); null = the token is gone
   // (show "Unknown agent").
   const creator = task.createdByTokenId ? (agents.get(task.createdByTokenId) ?? null) : undefined;
   const resumer = task.resumedByTokenId ? (agents.get(task.resumedByTokenId) ?? null) : undefined;
+
+  const onTagsChange = (tags: string[]) => {
+    void setTags({ taskId: task._id, tags }).catch(() => toast.error("Could not update tags."));
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge tone="info">{task.type}</Badge>
-        {task.tags.map((tag) => (
-          <Badge key={tag} tone="neutral">
-            {tag}
-          </Badge>
-        ))}
       </div>
       <h2 className="text-lg font-bold text-foreground">{task.title}</h2>
       {creator !== undefined || resumer !== undefined ? (
@@ -116,6 +119,10 @@ function TaskDetails(props: { task: TaskView }) {
           <p className="whitespace-pre-wrap text-sm text-foreground">{task.acceptanceCriteria}</p>
         </div>
       ) : null}
+      <div>
+        <SectionLabel>Tags</SectionLabel>
+        <TagEditor tags={task.tags} onChange={onTagsChange} />
+      </div>
     </div>
   );
 }

@@ -280,7 +280,6 @@ export default defineSchema({
     timezone: v.string(),
     // Skip a slot if the previous materialized task is still unresolved.
     skipIfPrevOpen: v.boolean(),
-    lastTaskId: v.optional(v.id("tasks")),
     lastMaterializedSlot: v.optional(v.number()),
     nextRunAt: v.number(),
     enabled: v.boolean(),

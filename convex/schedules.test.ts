@@ -1,7 +1,8 @@
 // @vitest-environment edge-runtime
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -15,6 +16,42 @@ const template = {
   title: "Daily standup review",
   instructions: "Review the overnight changes.",
 };
+
+// Insert a schedule row directly so the test controls nextRunAt precisely.
+async function insertSchedule(
+  t: ReturnType<typeof convexTest>,
+  userId: Id<"users">,
+  over: Partial<{
+    nextRunAt: number;
+    skipIfPrevOpen: boolean;
+    projectId: Id<"projects">;
+    createdByTokenId: Id<"apiTokens">;
+    enabled: boolean;
+    lastMaterializedSlot: number;
+  }> = {},
+) {
+  return t.run((ctx) =>
+    ctx.db.insert("schedules", {
+      userId,
+      name: "S",
+      cron: "0 9 * * *",
+      timezone: "UTC",
+      taskTemplate: template,
+      skipIfPrevOpen: over.skipIfPrevOpen ?? false,
+      nextRunAt: over.nextRunAt ?? Date.now() - 60_000,
+      enabled: over.enabled ?? true,
+      createdAt: Date.now(),
+      ...(over.projectId ? { projectId: over.projectId } : {}),
+      ...(over.createdByTokenId ? { createdByTokenId: over.createdByTokenId } : {}),
+      ...(over.lastMaterializedSlot !== undefined
+        ? { lastMaterializedSlot: over.lastMaterializedSlot }
+        : {}),
+    }),
+  );
+}
+
+const countTasks = (t: ReturnType<typeof convexTest>) =>
+  t.run((ctx) => ctx.db.query("tasks").collect());
 
 describe("schedules.create", () => {
   test("creates an enabled schedule with a future nextRunAt", async () => {
@@ -122,5 +159,89 @@ describe("schedules.list / setEnabled / remove", () => {
     ).rejects.toThrow();
     await asOwner.mutation(api.schedules.remove, { id });
     expect(await t.run((ctx) => ctx.db.get(id))).toBeNull();
+  });
+});
+
+describe("schedules.tick", () => {
+  test("materializes one open task for a due slot and advances nextRunAt", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await setupUser(t, "owner@example.com");
+    const slot = Date.now() - 60_000;
+    const id = await insertSchedule(t, userId, { nextRunAt: slot });
+
+    const res = await t.mutation(internal.schedules.tick, {});
+    expect(res.materialized).toBe(1);
+
+    const tasks = await countTasks(t);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].status).toBe("open");
+    expect(tasks[0].title).toBe(template.title);
+
+    const sched = await t.run((ctx) => ctx.db.get(id));
+    expect(sched?.nextRunAt).toBeGreaterThan(Date.now());
+    expect(sched?.lastMaterializedSlot).toBe(slot);
+  });
+
+  test("a long-overdue schedule makes exactly one catch-up task, not a burst", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await setupUser(t, "owner@example.com");
+    await insertSchedule(t, userId, { nextRunAt: Date.now() - 10 * 24 * 60 * 60 * 1000 });
+
+    const res = await t.mutation(internal.schedules.tick, {});
+    expect(res.materialized).toBe(1);
+    expect(await countTasks(t)).toHaveLength(1);
+  });
+
+  test("a second tick does not double-fire the same slot", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await setupUser(t, "owner@example.com");
+    await insertSchedule(t, userId, { nextRunAt: Date.now() - 60_000 });
+
+    await t.mutation(internal.schedules.tick, {});
+    const res2 = await t.mutation(internal.schedules.tick, {});
+    expect(res2.materialized).toBe(0);
+    expect(await countTasks(t)).toHaveLength(1);
+  });
+
+  test("skipIfPrevOpen drops a slot while the prior task is unresolved", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await setupUser(t, "owner@example.com");
+    const id = await insertSchedule(t, userId, {
+      nextRunAt: Date.now() - 60_000,
+      skipIfPrevOpen: true,
+    });
+
+    await t.mutation(internal.schedules.tick, {}); // task1 (open)
+    expect(await countTasks(t)).toHaveLength(1);
+
+    // Next slot comes due while task1 is still open → skip.
+    await t.run((ctx) => ctx.db.patch(id, { nextRunAt: Date.now() - 1_000 }));
+    const skipped = await t.mutation(internal.schedules.tick, {});
+    expect(skipped.materialized).toBe(0);
+    expect(await countTasks(t)).toHaveLength(1);
+
+    // Resolve task1, then a due slot materializes again.
+    const tasks = await countTasks(t);
+    await t.run((ctx) => ctx.db.patch(tasks[0]._id, { status: "done" }));
+    await t.run((ctx) => ctx.db.patch(id, { nextRunAt: Date.now() - 1_000 }));
+    const fired = await t.mutation(internal.schedules.tick, {});
+    expect(fired.materialized).toBe(1);
+    expect(await countTasks(t)).toHaveLength(2);
+  });
+
+  test("auto-disables a schedule whose project is gone", async () => {
+    const t = convexTest(schema, modules);
+    const userId = await setupUser(t, "owner@example.com");
+    const projectId = await t.run((ctx) =>
+      ctx.db.insert("projects", { name: "P", userId, isDefault: false, createdAt: Date.now() }),
+    );
+    const id = await insertSchedule(t, userId, { projectId, nextRunAt: Date.now() - 60_000 });
+    await t.run((ctx) => ctx.db.delete(projectId));
+
+    const res = await t.mutation(internal.schedules.tick, {});
+    expect(res.disabled).toBe(1);
+    expect(res.materialized).toBe(0);
+    expect((await t.run((ctx) => ctx.db.get(id)))?.enabled).toBe(false);
+    expect(await countTasks(t)).toHaveLength(0);
   });
 });

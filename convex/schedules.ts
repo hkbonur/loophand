@@ -1,9 +1,15 @@
 import { v, ConvexError } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation, type MutationCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 import { requireAuth } from "./lib/auth";
 import { assertOwnedProject } from "./lib/ownership";
+import { ensureDefaultProject } from "./lib/projectHelpers";
 import { nextSlot, isValidCron, isValidTimezone } from "./lib/cron";
-import { isTaskType, TASK_TYPES } from "./lib/taskConstants";
+import { normalizeTags } from "./lib/tags";
+import { maybeNotifyOwner } from "./lib/notifyOwner";
+
+// How many due schedules one tick materializes (full quotas in Phase 6).
+const TICK_BATCH = 100;
 
 // The create_task payload a schedule materializes each slot. Validated here so a
 // bad template is rejected at schedule-create rather than failing every tick.
@@ -28,7 +34,9 @@ const scheduleView = v.object({
   createdAt: v.number(),
 });
 
-// Validate cron / timezone / task type, throwing a clear error for each.
+// Validate cron / timezone / task type. Schedules are approval-only: the other
+// types need a per-run payload (a screenshot, render specs) a template can't
+// carry, so they're rejected here rather than failing at materialize time.
 function assertValidSchedule(cron: string, timezone: string, type: string): void {
   if (!isValidCron(cron)) {
     throw new ConvexError({ code: "VALIDATION_ERROR", message: `Invalid cron expression "${cron}".` });
@@ -36,10 +44,10 @@ function assertValidSchedule(cron: string, timezone: string, type: string): void
   if (!isValidTimezone(timezone)) {
     throw new ConvexError({ code: "VALIDATION_ERROR", message: `Unknown timezone "${timezone}".` });
   }
-  if (!isTaskType(type)) {
+  if (type !== "approval") {
     throw new ConvexError({
       code: "VALIDATION_ERROR",
-      message: `Unsupported task type "${type}". Supported: ${TASK_TYPES.join(", ")}.`,
+      message: "Scheduled tasks support only the approval type.",
     });
   }
 }
@@ -131,5 +139,134 @@ export const remove = mutation({
     }
     await ctx.db.delete(args.id);
     return null;
+  },
+});
+
+// ── Materialization (cron tick) ──────────────────────────────────────────────
+
+// The per-slot idempotency key. A repeat tick for the same slot can't create a
+// second task (createForAgent-style dedup on userId + key).
+function slotKey(scheduleId: Id<"schedules">, slot: number): string {
+  return `sched:${scheduleId}:${slot}`;
+}
+
+// Create one approval task for a due slot, idempotently. Approval-only, so the
+// insert is a plain open task — no payload, items, or deps.
+async function materializeScheduledTask(
+  ctx: MutationCtx,
+  schedule: Doc<"schedules">,
+  slot: number,
+): Promise<void> {
+  const idempotencyKey = slotKey(schedule._id, slot);
+  const existing = await ctx.db
+    .query("tasks")
+    .withIndex("by_idempotency", (q) =>
+      q.eq("userId", schedule.userId).eq("idempotencyKey", idempotencyKey),
+    )
+    .first();
+  if (existing) return;
+
+  const tpl = schedule.taskTemplate as {
+    type: string;
+    title: string;
+    instructions: string;
+    acceptanceCriteria?: string;
+    tags?: string[];
+  };
+  const projectId = schedule.projectId ?? (await ensureDefaultProject(ctx, schedule.userId));
+  const now = Date.now();
+  const taskId = await ctx.db.insert("tasks", {
+    userId: schedule.userId,
+    projectId,
+    createdByTokenId: schedule.createdByTokenId,
+    type: "approval",
+    title: tpl.title,
+    instructions: tpl.instructions,
+    acceptanceCriteria: tpl.acceptanceCriteria,
+    tags: normalizeTags(tpl.tags),
+    status: "open",
+    resultVersion: 0,
+    revision: 0,
+    idempotencyKey,
+    createdAt: now,
+    updatedAt: now,
+  });
+  await ctx.db.insert("taskActivity", {
+    taskId,
+    type: "created",
+    actorTokenId: schedule.createdByTokenId,
+    createdAt: now,
+  });
+  await maybeNotifyOwner(ctx, schedule.userId, taskId, now);
+}
+
+// Is a schedule's board/token still alive? A gone project or revoked token means
+// the schedule can never produce a valid task — auto-disable rather than error
+// every minute.
+async function scheduleIsAlive(ctx: MutationCtx, schedule: Doc<"schedules">): Promise<boolean> {
+  if (schedule.projectId) {
+    const project = await ctx.db.get(schedule.projectId);
+    if (!project || project.userId !== schedule.userId) return false;
+  }
+  if (schedule.createdByTokenId) {
+    const token = await ctx.db.get(schedule.createdByTokenId);
+    if (!token || token.revokedAt) return false;
+  }
+  return true;
+}
+
+// Minute cron: materialize one task per due slot. Idempotency hinges on
+// advancing nextRunAt to the next FUTURE slot BEFORE creating (so a slow/retried
+// tick can't double-fire) and on the per-slot key. Backfill is bounded — after
+// downtime nextRunAt jumps past `now`, so exactly one catch-up task is made, not
+// a replayed burst. skipIfPrevOpen drops a slot whose prior task is unresolved.
+export const tick = internalMutation({
+  args: {},
+  returns: v.object({ materialized: v.number(), disabled: v.number() }),
+  handler: async (ctx) => {
+    const now = Date.now();
+    const due = await ctx.db
+      .query("schedules")
+      .withIndex("by_next_run", (q) => q.lte("nextRunAt", now))
+      .take(TICK_BATCH);
+
+    let materialized = 0;
+    let disabled = 0;
+    for (const schedule of due) {
+      if (!schedule.enabled) continue;
+      if (!(await scheduleIsAlive(ctx, schedule))) {
+        await ctx.db.patch(schedule._id, { enabled: false });
+        disabled++;
+        continue;
+      }
+
+      const slot = schedule.nextRunAt;
+      const next = nextSlot(schedule.cron, schedule.timezone, now);
+
+      // Skip this slot if the previous materialized task is still unresolved.
+      let skip = false;
+      if (schedule.skipIfPrevOpen && schedule.lastMaterializedSlot !== undefined) {
+        const prev = await ctx.db
+          .query("tasks")
+          .withIndex("by_idempotency", (q) =>
+            q
+              .eq("userId", schedule.userId)
+              .eq("idempotencyKey", slotKey(schedule._id, schedule.lastMaterializedSlot as number)),
+          )
+          .first();
+        if (prev && (prev.status === "open" || prev.status === "blocked")) skip = true;
+      }
+
+      // Advance first — even when skipping — so this slot is never re-fired.
+      await ctx.db.patch(schedule._id, {
+        nextRunAt: next,
+        lastMaterializedSlot: skip ? schedule.lastMaterializedSlot : slot,
+      });
+      if (skip) continue;
+
+      await materializeScheduledTask(ctx, schedule, slot);
+      materialized++;
+    }
+    return { materialized, disabled };
   },
 });

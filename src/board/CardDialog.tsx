@@ -7,6 +7,7 @@ import { Spinner } from "../ui/spinner";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { ResultPanel } from "./ResultPanel";
 import { VisualReview } from "./visual-review/VisualReview";
+import { SectionLabel } from "./SectionLabel";
 import type { TaskView } from "./types";
 
 interface Props {
@@ -63,16 +64,12 @@ function TaskDetails(props: { task: TaskView }) {
       </div>
       <h2 className="text-lg font-bold text-foreground">{task.title}</h2>
       <div>
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Instructions
-        </p>
+        <SectionLabel>Instructions</SectionLabel>
         <p className="whitespace-pre-wrap text-sm text-foreground">{task.instructions}</p>
       </div>
       {task.acceptanceCriteria ? (
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Acceptance criteria
-          </p>
+          <SectionLabel>Acceptance criteria</SectionLabel>
           <p className="whitespace-pre-wrap text-sm text-foreground">{task.acceptanceCriteria}</p>
         </div>
       ) : null}

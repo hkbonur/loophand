@@ -3,7 +3,7 @@ import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
 import { ConvexAuthProvider } from "../convex-client";
 import { Toaster } from "../ui/toaster";
 import { ServiceWorker } from "../pwa/ServiceWorker";
-import ThemeToggle from "../components/ThemeToggle";
+import { AccountMenu } from "../components/AccountMenu";
 
 import appCss from "../styles.css?url";
 
@@ -35,7 +35,7 @@ function RootDocument(props: { children: React.ReactNode }) {
       <body className="min-h-screen bg-background font-sans antialiased [overflow-wrap:anywhere] selection:bg-foreground/15">
         <ConvexAuthProvider>
           <div className="fixed right-4 top-4 z-40">
-            <ThemeToggle />
+            <AccountMenu />
           </div>
           {props.children}
           <Toaster />

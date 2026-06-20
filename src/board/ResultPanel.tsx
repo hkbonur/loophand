@@ -1,4 +1,5 @@
 import { Badge } from "../ui/badge";
+import { SectionLabel } from "./SectionLabel";
 import { outcomeBadge } from "./format";
 import type { TaskView } from "./types";
 import { isVisualReviewResult, VisualReviewResult } from "./visual-review/VisualReviewResult";
@@ -19,9 +20,7 @@ export function ResultPanel(props: Props) {
         </div>
       ) : null}
       <div>
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Returns to the agent
-        </p>
+        <SectionLabel>Returns to the agent</SectionLabel>
         {isVisualReviewResult(task.result) ? (
           <VisualReviewResult result={task.result} screenshotUrl={task.screenshotUrl} />
         ) : (

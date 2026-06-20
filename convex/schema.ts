@@ -251,6 +251,21 @@ export default defineSchema({
     createdAt: v.number(),
   }).index("by_task", ["taskId"]),
 
+  // Standing rules / preferences (Phase 6). Project-scoped key/value strings with
+  // a user-level fallback: a row with `projectId` omitted applies across every
+  // board; a row with a `projectId` overrides it for that board. Agents read the
+  // resolved map via get_task before asking the human (the round-trip reducer).
+  preferences: defineTable({
+    userId: v.id("users"),
+    projectId: v.optional(v.id("projects")),
+    key: v.string(),
+    value: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_scope_key", ["userId", "projectId", "key"]),
+
   // Resolution audit — one row per human action.
   taskAudit: defineTable({
     taskId: v.id("tasks"),

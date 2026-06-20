@@ -1,5 +1,6 @@
 import type { Id } from "../_generated/dataModel";
 import type { TASK_STATUSES, TASK_OUTCOMES } from "../schema";
+import type { AgentComment } from "./comments";
 
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 export type TaskOutcome = (typeof TASK_OUTCOMES)[number];
@@ -21,4 +22,12 @@ export interface AgentTaskView {
   // Present only on multi-item tasks (ADR-0002); null otherwise.
   item_count: number | null;
   items_done: number | null;
+}
+
+// The consume-point view (get_task / await_task): the base view plus the
+// round-trip context an agent reads before acting.
+export interface AgentTaskDetail extends AgentTaskView {
+  comments: AgentComment[];
+  guidance: string | null;
+  preferences: Record<string, string>;
 }

@@ -23,6 +23,13 @@ import {
 import { isTaskType, TASK_TYPES, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
 import { assertDocItemData } from "./lib/render";
 import { normalizeTags } from "./lib/tags";
+import {
+  normalizeCommentBody,
+  latestGuidance,
+  MAX_RETURNED_COMMENTS,
+  type AgentComment,
+} from "./lib/comments";
+import { resolveForProject } from "./preferences";
 import { rateLimiter } from "./rateLimit";
 import { enforceLimit } from "./lib/rateLimitGuard";
 import { initialTaskState } from "./lib/deps";
@@ -69,7 +76,7 @@ const docAnnotationValidator = v.object({
 const annotationValidator = v.union(screenshotAnnotationValidator, docAnnotationValidator);
 
 // Agent-facing payload — snake_case for MCP ergonomics.
-const agentViewValidator = v.object({
+const agentViewFields = {
   task_id: v.id("tasks"),
   project_id: v.id("projects"),
   type: v.string(),
@@ -82,6 +89,21 @@ const agentViewValidator = v.object({
   // Present only on multi-item tasks (ADR-0002).
   item_count: v.union(v.number(), v.null()),
   items_done: v.union(v.number(), v.null()),
+};
+const agentViewValidator = v.object(agentViewFields);
+
+// The richer view get_task / await_task return on consume: the base view plus
+// the round-trip context an agent reads before acting — the comment thread, the
+// freshest human guidance, and the project's resolved preferences.
+const commentEntryValidator = v.object({
+  body: v.string(),
+  created_at: v.number(),
+});
+const agentTaskDetailValidator = v.object({
+  ...agentViewFields,
+  comments: v.array(commentEntryValidator),
+  guidance: v.union(v.string(), v.null()),
+  preferences: v.record(v.string(), v.string()),
 });
 
 // Human-facing card payload — the full task as the board renders it.
@@ -405,14 +427,38 @@ export const createForAgent = internalMutation({
   },
 });
 
-// get_task / await_task consume point: flips a resolved task to Agent working.
+// The task's comment thread, oldest first, classified by author.
+async function commentsForTask(
+  ctx: QueryCtx | MutationCtx,
+  taskId: Id<"tasks">,
+): Promise<AgentComment[]> {
+  const rows = await ctx.db
+    .query("taskComments")
+    .withIndex("by_task", (q) => q.eq("taskId", taskId))
+    .collect();
+  return rows
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .map((r) => ({ body: r.body, created_at: r.createdAt }));
+}
+
+// get_task / await_task consume point: flips a resolved task to Agent working and
+// returns the round-trip context (comments, guidance, preferences) alongside it.
 export const consumeForAgent = internalMutation({
   args: { userId: v.id("users"), tokenId: v.id("apiTokens"), taskId: v.string() },
-  returns: agentViewValidator,
+  returns: agentTaskDetailValidator,
   handler: async (ctx, args) => {
     const task = await assertOwnedTask(ctx, requireTaskId(ctx, args.taskId), args.userId);
     const consumed = await consumeIfResolved(ctx, task, args.tokenId);
-    return toAgentView(consumed);
+    const thread = await commentsForTask(ctx, consumed._id);
+    const preferences = await resolveForProject(ctx, args.userId, consumed.projectId);
+    return {
+      ...toAgentView(consumed),
+      // Guidance comes from the full thread; the returned slice is bounded so the
+      // payload stays small on long-lived tasks.
+      comments: thread.slice(-MAX_RETURNED_COMMENTS),
+      guidance: latestGuidance(thread),
+      preferences,
+    };
   },
 });
 
@@ -661,6 +707,39 @@ export const setTags = mutation({
     const updated = await ctx.db.get(args.taskId);
     if (!updated) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
     return enrichTaskView(ctx, updated);
+  },
+});
+
+// Human comment on a task — the round-trip reducer's write side. The agent reads
+// these back (plus the derived `guidance`) through get_task, so a human can
+// steer the agent without cancelling and re-creating the task.
+const commentViewValidator = v.object({
+  _id: v.id("taskComments"),
+  body: v.string(),
+  createdAt: v.number(),
+});
+
+export const addComment = mutation({
+  args: { taskId: v.id("tasks"), body: v.string() },
+  returns: commentViewValidator,
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    await assertOwnedTask(ctx, args.taskId, userId);
+    const body = normalizeCommentBody(args.body);
+    const now = Date.now();
+    const commentId = await ctx.db.insert("taskComments", {
+      taskId: args.taskId,
+      userId,
+      body,
+      createdAt: now,
+    });
+    await ctx.db.insert("taskActivity", {
+      taskId: args.taskId,
+      type: "commented",
+      actorUserId: userId,
+      createdAt: now,
+    });
+    return { _id: commentId, body, createdAt: now };
   },
 });
 

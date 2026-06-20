@@ -3,7 +3,8 @@ import { internal } from "../../../../_generated/api";
 import { defineTool } from "../../lib/defineTool";
 import { mcpSuccess, mcpEnvelope } from "../../lib/responses";
 import { requireTaskScope } from "../lib/scope";
-import type { AgentTaskView } from "../../../../lib/taskViews";
+import type { AgentTaskDetail } from "../../../../lib/taskViews";
+import { commentShape, preferencesShape } from "./roundTripShapes";
 
 const DEFAULT_TIMEOUT_SECONDS = 30;
 const MAX_TIMEOUT_SECONDS = 120;
@@ -38,6 +39,10 @@ export const awaitTaskTool = defineTool({
     result: z.unknown().optional(),
     result_version: z.number().optional(),
     task_id: z.string(),
+    // Round-trip context, present only on the resolved (non-pending) envelope.
+    comments: z.array(commentShape).optional(),
+    guidance: z.string().nullable().optional(),
+    preferences: preferencesShape.optional(),
     poll_after_ms: z.number().optional(),
     resume: z.string().optional(),
   }),
@@ -57,7 +62,7 @@ export const awaitTaskTool = defineTool({
         },
       );
       if (probe.awaitReady) {
-        const task: AgentTaskView = await mcpCtx.ctx.runMutation(internal.tasks.consumeForAgent, {
+        const task: AgentTaskDetail = await mcpCtx.ctx.runMutation(internal.tasks.consumeForAgent, {
           userId: mcpCtx.userId,
           tokenId: mcpCtx.tokenId,
           taskId: input.task_id,
@@ -68,6 +73,9 @@ export const awaitTaskTool = defineTool({
           result: task.result,
           result_version: task.result_version,
           task_id: task.task_id,
+          comments: task.comments,
+          guidance: task.guidance,
+          preferences: task.preferences,
         });
       }
       await sleep(POLL_INTERVAL_MS);

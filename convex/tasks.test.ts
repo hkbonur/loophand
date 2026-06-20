@@ -596,3 +596,58 @@ describe("tasks dependencies (failure cascade)", () => {
     expect((await rowOf(t, child.task_id))?.status).toBe("open");
   });
 });
+
+describe("tasks.deps view + depCount", () => {
+  async function create(
+    t: ReturnType<typeof convexTest>,
+    ids: { userId: Id<"users">; tokenId: Id<"apiTokens"> },
+    dependsOn?: string[],
+  ) {
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId: ids.userId,
+      tokenId: ids.tokenId,
+      type: "approval",
+      title: "t",
+      instructions: "t",
+      dependsOn,
+    });
+    return task;
+  }
+
+  test("deps() returns blockedBy and blocks neighbours", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    const a = await create(t, ids);
+    const b = await create(t, ids, [a.task_id]);
+
+    const bDeps = await asOwner.query(api.tasks.deps, { taskId: b.task_id });
+    expect(bDeps.blockedBy.map((d) => d._id)).toEqual([a.task_id]);
+    expect(bDeps.blocks).toEqual([]);
+
+    const aDeps = await asOwner.query(api.tasks.deps, { taskId: a.task_id });
+    expect(aDeps.blocks.map((d) => d._id)).toEqual([b.task_id]);
+    expect(aDeps.blockedBy).toEqual([]);
+  });
+
+  test("deps() is owner-checked", async () => {
+    const t = convexTest(schema, modules);
+    const owner = await setupOwner(t, "owner@example.com");
+    await setupOwner(t, "stranger@example.com");
+    const a = await create(t, owner);
+    await expect(
+      t.withIdentity({ email: "stranger@example.com" }).query(api.tasks.deps, { taskId: a.task_id }),
+    ).rejects.toThrow();
+  });
+
+  test("depCount is the dep total for a blocked task, 0 otherwise", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await setupOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+    const a = await create(t, ids);
+    const b = await create(t, ids, [a.task_id]);
+
+    expect((await asOwner.query(api.tasks.get, { taskId: b.task_id }))?.depCount).toBe(1);
+    expect((await asOwner.query(api.tasks.get, { taskId: a.task_id }))?.depCount).toBe(0);
+  });
+});

@@ -107,10 +107,25 @@ const taskViewValidator = v.object({
   revision: v.number(),
   createdByTokenId: v.union(v.id("apiTokens"), v.null()),
   resumedByTokenId: v.union(v.id("apiTokens"), v.null()),
+  // Number of tasks this one waits on — drives the blocked lane's lock badge.
+  // Counted only for blocked tasks (0 otherwise) to keep the board query cheap.
+  depCount: v.number(),
   createdAt: v.number(),
   updatedAt: v.number(),
   expiresAt: v.union(v.number(), v.null()),
 });
+
+// Compact neighbour in the dependency mini-view (a blocker or a blocked task).
+const depEntryValidator = v.object({
+  _id: v.id("tasks"),
+  title: v.string(),
+  status: statusValidator,
+  outcome: v.union(outcomeValidator, v.null()),
+});
+
+function toDepEntry(task: Doc<"tasks">) {
+  return { _id: task._id, title: task.title, status: task.status, outcome: task.outcome ?? null };
+}
 
 function toAgentView(task: Doc<"tasks">) {
   return {
@@ -166,10 +181,21 @@ async function resolveScreenshotUrl(
 // The board view plus the fields that need a lookup: the tool payload and its
 // resolved screenshot URL.
 async function enrichTaskView(ctx: QueryCtx | MutationCtx, task: Doc<"tasks">) {
+  // Only blocked cards surface a dep count; skip the lookup otherwise.
+  const depCount =
+    task.status === "blocked"
+      ? (
+          await ctx.db
+            .query("taskDeps")
+            .withIndex("by_task", (q) => q.eq("taskId", task._id))
+            .collect()
+        ).length
+      : 0;
   return {
     ...toTaskView(task),
     toolPayload: task.toolPayload ?? null,
     screenshotUrl: await resolveScreenshotUrl(ctx, task.toolPayload),
+    depCount,
   };
 }
 
@@ -679,6 +705,43 @@ export const get = query({
     const task = await ctx.db.get(taskId);
     if (!task || task.userId !== userId) return null;
     return enrichTaskView(ctx, task);
+  },
+});
+
+// Dependency neighbours for the card dialog's mini-view: what this task waits on
+// (blockedBy) and what waits on it (blocks). Owner-checked.
+export const deps = query({
+  args: { taskId: v.id("tasks") },
+  returns: v.object({
+    blockedBy: v.array(depEntryValidator),
+    blocks: v.array(depEntryValidator),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    await assertOwnedTask(ctx, args.taskId, userId);
+
+    const blockerEdges = await ctx.db
+      .query("taskDeps")
+      .withIndex("by_task", (q) => q.eq("taskId", args.taskId))
+      .collect();
+    const dependentEdges = await ctx.db
+      .query("taskDeps")
+      .withIndex("by_dependsOn", (q) => q.eq("dependsOnTaskId", args.taskId))
+      .collect();
+
+    const resolve = async (ids: Array<Id<"tasks">>) => {
+      const rows = [];
+      for (const id of ids) {
+        const row = await ctx.db.get(id);
+        if (row) rows.push(toDepEntry(row));
+      }
+      return rows;
+    };
+
+    return {
+      blockedBy: await resolve(blockerEdges.map((e) => e.dependsOnTaskId)),
+      blocks: await resolve(dependentEdges.map((e) => e.taskId)),
+    };
   },
 });
 

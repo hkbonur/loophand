@@ -6,6 +6,45 @@
 
 ---
 
+## Resolved decisions (grill, 2026-06-20) — supersede conflicting body text
+
+See `CONTEXT.md` (glossary) and `docs/adr/0001`, `docs/adr/0002`.
+
+1. **Naming:** task type is **`doc_review`** (mirrors `visual_review`); the agent supplies a
+   **render spec** inside the payload. No `doc_render` task type. Frontend `DocReview`,
+   result tag `tool:"doc_review"`.
+2. **`fetch_file` returns a short-TTL signed R2 URL** (ADR-0001). Owner-checked at the MCP
+   layer (already bearer-authed) + task ownership + name resolution, then `r2.getUrl(key,
+   {expiresIn: SIGNED_URL_TTL_SECONDS})`. Never the raw key, never the public proxy, never
+   base64 bytes. The public `/api/storage` proxy stays public for board `<img>` embeds.
+   `fetch` is already in `ALLOWED_VERBS`/`READ_VERBS` — no rename needed.
+3. **Output name** lives in a new optional `name` field on `managedFileReferences` +
+   `by_owner_name` index `[ownerType, ownerId, name]`. Outputs are owned by the **task**
+   (`ownerType:"task"`, `ownerId: taskId`, `name:"item-{n}.pdf"`). The plan's
+   "encode in `ownerKey`" note describes a different schema — ignore it. Existing screenshot
+   refs keep `name` undefined.
+4. **Multi-item is opt-in** via `items[]` at create. `itemCount`/`taskItems` only exist
+   then; single-surface tasks are untouched (no rail, `itemCount` unset).
+5. **Doc output is the approved rendered PDF.** Client renders react-pdf → PDF; on approve
+   it uploads browser→R2 (`generateUploadUrl` + a session-auth `recordOutput` mutation that
+   writes `managedFiles` + a named `managedFileReferences` row owned by the task). This is a
+   NEW human-side upload path (today only agents upload).
+6. **Render spec, Phase 3 = `react_pdf` only**: a whitelisted, serializable JSON tree
+   (`Document > Page > (View|Text|Image|Link)` + a style subset) mapped to
+   `@react-pdf/renderer` on the client. No server render, no `eval`. `kind:"xsl_fo"` is
+   reserved in the union but rejected `NOT_IMPLEMENTED` (no FOP action this phase).
+7. **Annotations are a discriminated union** keyed on `surface`:
+   `{surface:"screenshot", viewport, …}` | `{surface:"doc", page, …}`. New visual_review
+   annotations carry `surface:"screenshot"`. `resolve()` validates the right variant per type.
+8. **Item loop = continuous-open** (ADR-0002). Multi-item tasks stay `open` across rounds.
+   `items.setStatus` bumps `itemsDone` (OCC-safe); when `itemsDone === itemCount` the rollup
+   wakes `await_task`. All `approved` → task `done`; any `changes_requested` → stays `open`
+   and the agent patches those items back to `pending` (drops `itemsDone`, re-arms await).
+   `itemsDone` (not task `status`) drives both the await signal and completion. `await_task`
+   gains an item-count predicate for multi-item tasks.
+
+---
+
 ## Backend (Convex)
 
 1. **Artifact outputs via R2 (`managedFiles`/`managedFileReferences`):**

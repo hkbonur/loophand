@@ -23,6 +23,7 @@ import {
 import { isTaskType, TASK_TYPES, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
 import { assertDocItemData } from "./lib/render";
 import { normalizeTags } from "./lib/tags";
+import { normalizeCommentBody } from "./lib/comments";
 import { rateLimiter } from "./rateLimit";
 import { enforceLimit } from "./lib/rateLimitGuard";
 import { initialTaskState } from "./lib/deps";
@@ -661,6 +662,40 @@ export const setTags = mutation({
     const updated = await ctx.db.get(args.taskId);
     if (!updated) throw new ConvexError({ code: "NOT_FOUND", message: "Task not found" });
     return enrichTaskView(ctx, updated);
+  },
+});
+
+// Human comment on a task — the round-trip reducer's write side. The agent reads
+// these back (plus the derived `guidance`) through get_task, so a human can
+// steer the agent without cancelling and re-creating the task.
+const commentViewValidator = v.object({
+  _id: v.id("taskComments"),
+  author: v.union(v.literal("human"), v.literal("agent")),
+  body: v.string(),
+  createdAt: v.number(),
+});
+
+export const addComment = mutation({
+  args: { taskId: v.id("tasks"), body: v.string() },
+  returns: commentViewValidator,
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    await assertOwnedTask(ctx, args.taskId, userId);
+    const body = normalizeCommentBody(args.body);
+    const now = Date.now();
+    const commentId = await ctx.db.insert("taskComments", {
+      taskId: args.taskId,
+      userId,
+      body,
+      createdAt: now,
+    });
+    await ctx.db.insert("taskActivity", {
+      taskId: args.taskId,
+      type: "commented",
+      actorUserId: userId,
+      createdAt: now,
+    });
+    return { _id: commentId, author: "human" as const, body, createdAt: now };
   },
 });
 

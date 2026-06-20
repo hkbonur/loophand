@@ -12,6 +12,8 @@ import { r2, generateR2Key } from "./lib/r2";
 import { requireAuth } from "./lib/auth";
 import { assertOwnedTask } from "./lib/ownership";
 import { assertOutputSize, assertWithinStorageQuota } from "./lib/limits";
+import { rateLimiter } from "./rateLimit";
+import { enforceLimit } from "./lib/rateLimitGuard";
 
 // Minimum hold for an uploaded-but-unreferenced blob: once this lapses the
 // upload is eligible for reclamation by the daily cleanup cron (so actual
@@ -33,6 +35,10 @@ export const registerUpload = internalMutation({
   },
   returns: v.id("managedFiles"),
   handler: async (ctx, args) => {
+    await enforceLimit(
+      () => rateLimiter.limit(ctx, "uploadUrl", { key: args.userId }),
+      "upload",
+    );
     const now = Date.now();
     const fileId = await ctx.db.insert("managedFiles", {
       r2Key: args.r2Key,
@@ -110,6 +116,7 @@ export const startOutputUpload = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
     await assertOwnedTask(ctx, args.taskId, userId);
+    await enforceLimit(() => rateLimiter.limit(ctx, "uploadUrl", { key: userId }), "upload");
     const key = generateR2Key();
     const { url } = await r2.generateUploadUrl(key);
     const now = Date.now();

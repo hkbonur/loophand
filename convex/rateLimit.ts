@@ -13,6 +13,10 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // Phase 6 — generous enough to never bite normal use, a backstop against a
   // runaway agent flooding the board. Enforced fail-open in tasks.createForAgent.
   createTask: { kind: "token bucket", rate: 30, period: MINUTE, capacity: 60 },
+  // Per-user upload budget — backstops a flood of signed-URL mints / blob
+  // registrations (each can land a multi-MB object in R2). Enforced fail-open in
+  // files.startOutputUpload + files.registerUpload.
+  uploadUrl: { kind: "token bucket", rate: 60, period: MINUTE, capacity: 120 },
 });
 
 // Returns `true` when the caller has exhausted its failure budget.

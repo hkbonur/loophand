@@ -16,7 +16,7 @@ function initialsOf(name: string | null, email: string): string {
 
 function Avatar(props: { image: string | null; name: string | null; email: string }) {
   return (
-    <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-xs font-semibold tracking-wide text-foreground shadow-sm ring-1 ring-inset ring-foreground/15">
+    <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-xs font-semibold tracking-wide text-foreground shadow-sm ring-2 ring-inset ring-primary">
       {props.image ? (
         <img src={props.image} alt="" className="size-full object-cover" />
       ) : (
@@ -76,16 +76,16 @@ export function AccountMenu() {
         aria-label={`Account: ${displayName}`}
         title={displayName}
         className={cn(
-          "rounded-full ring-2 ring-foreground/15 ring-offset-2 ring-offset-background transition duration-200 ease-out",
+          "rounded-full ring-2 ring-foreground/15 transition duration-200 ease-out",
           "hover:ring-foreground/40 focus-visible:outline-none focus-visible:ring-ring/60",
           "motion-safe:hover:scale-[1.04] motion-safe:active:scale-100",
-          open && "ring-foreground/40",
+          { "ring-primary/40": open },
         )}
       >
         <Avatar image={user.image} name={user.name} email={user.email} />
       </button>
 
-      {open ? (
+      {open && (
         <div
           role="menu"
           className="absolute right-0 top-[calc(100%+0.5rem)] w-60 origin-top-right rounded-2xl border border-border bg-card p-1 shadow-xl"
@@ -116,7 +116,7 @@ export function AccountMenu() {
             {signingOut ? "Signing out…" : "Sign out"}
           </button>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

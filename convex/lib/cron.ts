@@ -22,3 +22,14 @@ export function isValidCron(cron: string): boolean {
     return false;
   }
 }
+
+// An IANA timezone the runtime's Intl can resolve (e.g. "America/New_York").
+export function isValidTimezone(tz: string): boolean {
+  if (!tz.trim()) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}

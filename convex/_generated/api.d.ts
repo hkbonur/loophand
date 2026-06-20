@@ -63,6 +63,7 @@ import type * as projects from "../projects.js";
 import type * as push from "../push.js";
 import type * as rateLimit from "../rateLimit.js";
 import type * as reconcile from "../reconcile.js";
+import type * as schedules from "../schedules.js";
 import type * as seed from "../seed.js";
 import type * as tasks from "../tasks.js";
 import type * as users from "../users.js";
@@ -129,6 +130,7 @@ declare const fullApi: ApiFromModules<{
   push: typeof push;
   rateLimit: typeof rateLimit;
   reconcile: typeof reconcile;
+  schedules: typeof schedules;
   seed: typeof seed;
   tasks: typeof tasks;
   users: typeof users;

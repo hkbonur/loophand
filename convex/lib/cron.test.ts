@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { nextSlot, isValidCron } from "./cron";
+import { nextSlot, isValidCron, isValidTimezone } from "./cron";
 
 describe("isValidCron", () => {
   test("accepts standard 5-field expressions", () => {
@@ -9,6 +9,17 @@ describe("isValidCron", () => {
   test("rejects garbage", () => {
     expect(isValidCron("not a cron")).toBe(false);
     expect(isValidCron("")).toBe(false);
+  });
+});
+
+describe("isValidTimezone", () => {
+  test("accepts IANA zones", () => {
+    expect(isValidTimezone("America/New_York")).toBe(true);
+    expect(isValidTimezone("UTC")).toBe(true);
+  });
+  test("rejects empty or bogus zones", () => {
+    expect(isValidTimezone("")).toBe(false);
+    expect(isValidTimezone("Mars/Phobos")).toBe(false);
   });
 });
 

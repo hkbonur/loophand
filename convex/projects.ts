@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { requireAuth } from "./lib/auth";
+import { assertOwnedProject } from "./lib/ownership";
 import { ensureDefaultProject, createProject, listProjects } from "./lib/projectHelpers";
 
 const projectShape = v.object({
@@ -36,6 +37,23 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
     return createProject(ctx, userId, args.name);
+  },
+});
+
+// Distinct tags across a project's tasks, sorted — feeds the board's tag filter.
+export const distinctTags = query({
+  args: { projectId: v.id("projects") },
+  returns: v.array(v.string()),
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    await assertOwnedProject(ctx, args.projectId, userId);
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    const tags = new Set<string>();
+    for (const task of tasks) for (const tag of task.tags) tags.add(tag);
+    return [...tags].sort();
   },
 });
 

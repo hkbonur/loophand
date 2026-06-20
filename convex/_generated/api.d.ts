@@ -50,6 +50,7 @@ import type * as lib_ownership from "../lib/ownership.js";
 import type * as lib_projectHelpers from "../lib/projectHelpers.js";
 import type * as lib_pushPayload from "../lib/pushPayload.js";
 import type * as lib_r2 from "../lib/r2.js";
+import type * as lib_render from "../lib/render.js";
 import type * as lib_screenshots from "../lib/screenshots.js";
 import type * as lib_taskConstants from "../lib/taskConstants.js";
 import type * as lib_taskViews from "../lib/taskViews.js";
@@ -111,6 +112,7 @@ declare const fullApi: ApiFromModules<{
   "lib/projectHelpers": typeof lib_projectHelpers;
   "lib/pushPayload": typeof lib_pushPayload;
   "lib/r2": typeof lib_r2;
+  "lib/render": typeof lib_render;
   "lib/screenshots": typeof lib_screenshots;
   "lib/taskConstants": typeof lib_taskConstants;
   "lib/taskViews": typeof lib_taskViews;

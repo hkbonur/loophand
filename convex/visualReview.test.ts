@@ -215,8 +215,8 @@ describe("visual_review resolve → agent round-trip", () => {
     const t = convexTest(schema, modules);
     const { userId, tokenId, taskId } = await openVisualReview(t, "roundtripkey000001");
     const annotations = [
-      { shape: "box" as const, points: [10, 10, 100, 50], viewport: "desktop" as const, severity: "blocker" as const, comment: "misaligned header" },
-      { shape: "pen" as const, points: [1, 2, 3, 4, 5, 6], viewport: "mobile" as const, severity: "nit" as const, comment: "sketchy edge" },
+      { surface: "screenshot" as const, shape: "box" as const, points: [10, 10, 100, 50], viewport: "desktop" as const, severity: "blocker" as const, comment: "misaligned header" },
+      { surface: "screenshot" as const, shape: "pen" as const, points: [1, 2, 3, 4, 5, 6], viewport: "mobile" as const, severity: "nit" as const, comment: "sketchy edge" },
     ];
 
     const asOwner = t.withIdentity({ email: "owner@example.com" });
@@ -264,7 +264,7 @@ describe("visual_review resolve → agent round-trip", () => {
         action: "approve",
         revision: 0,
         annotations: [
-          { shape: "box" as const, points: [0, 0, 1, 1], viewport: "desktop" as const, severity: "nit" as const, comment: "x" },
+          { surface: "screenshot" as const, shape: "box" as const, points: [0, 0, 1, 1], viewport: "desktop" as const, severity: "nit" as const, comment: "x" },
         ],
       }),
     ).rejects.toThrow();

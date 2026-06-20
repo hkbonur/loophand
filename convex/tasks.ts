@@ -21,6 +21,7 @@ import {
   toolPayloadValidator,
 } from "./schema";
 import { isTaskType, TASK_TYPES, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
+import { assertDocItemData } from "./lib/render";
 
 const statusValidator = v.union(...TASK_STATUSES.map((s) => v.literal(s)));
 const outcomeValidator = v.union(...TASK_OUTCOMES.map((o) => v.literal(o)));
@@ -33,18 +34,32 @@ const toolPayloadInputValidator = v.object({
   viewports: v.optional(v.array(viewportValidator)),
 });
 
-// One mark the human draws on the screenshot. Shape-agnostic so the canvas can
+// One mark the human draws on a review surface. Shape-agnostic so the canvas can
 // grow (box / arrow / freehand pen / numbered pin) without changing the
 // agent-facing contract. `points` is interpreted per shape: box [x,y,w,h],
 // arrow [x1,y1,x2,y2], pen [x1,y1,x2,y2,…] (a freehand sketch), pin [x,y].
-const annotationValidator = v.object({
+//
+// Discriminated on `surface`: a screenshot mark is placed on a viewport, a doc
+// mark on a page. The two surfaces are otherwise identical, but the locator
+// differs, so the union keeps each precise (Q7 / Phase 3).
+const annotationShape = {
   shape: v.union(v.literal("box"), v.literal("arrow"), v.literal("pen"), v.literal("pin")),
   points: v.array(v.number()),
   label: v.optional(v.number()),
-  viewport: viewportValidator,
   severity: v.union(v.literal("blocker"), v.literal("nit")),
   comment: v.string(),
+};
+const screenshotAnnotationValidator = v.object({
+  surface: v.literal("screenshot"),
+  viewport: viewportValidator,
+  ...annotationShape,
 });
+const docAnnotationValidator = v.object({
+  surface: v.literal("doc"),
+  page: v.number(),
+  ...annotationShape,
+});
+const annotationValidator = v.union(screenshotAnnotationValidator, docAnnotationValidator);
 
 // Agent-facing payload — snake_case for MCP ergonomics.
 const agentViewValidator = v.object({
@@ -273,6 +288,18 @@ export const createForAgent = internalMutation({
         code: "VALIDATION_ERROR",
         message: "Pass either items[] (multi-item) or tool_payload (single), not both.",
       });
+    }
+
+    // A doc_review carries one render spec per item (even a single doc is a
+    // one-item rail) — there's no tool_payload surface for it.
+    if (args.type === "doc_review") {
+      if (!items) {
+        throw new ConvexError({
+          code: "VALIDATION_ERROR",
+          message: "doc_review requires items[] — one render spec per document.",
+        });
+      }
+      items.forEach((item, i) => assertDocItemData(item.data, `items[${i}]`));
     }
 
     // Idempotency: a retried create with the same key returns the first row.
@@ -536,11 +563,22 @@ export const resolve = mutation({
         message: "Task changed since you loaded it. Reload and try again.",
       });
     }
-    if (args.annotations && args.annotations.length > 0 && task.type !== "visual_review") {
-      throw new ConvexError({
-        code: "VALIDATION_ERROR",
-        message: "annotations are only valid for visual_review tasks.",
-      });
+    if (args.annotations && args.annotations.length > 0) {
+      // resolve() is the single-task path; only visual_review marks up here, and
+      // only on the screenshot surface. (doc_review marks flow per-item through
+      // items.setStatus.)
+      if (task.type !== "visual_review") {
+        throw new ConvexError({
+          code: "VALIDATION_ERROR",
+          message: "annotations are only valid for visual_review tasks.",
+        });
+      }
+      if (args.annotations.some((a) => a.surface !== "screenshot")) {
+        throw new ConvexError({
+          code: "VALIDATION_ERROR",
+          message: "visual_review annotations must be on the screenshot surface.",
+        });
+      }
     }
 
     const mapping = RESOLUTION[args.action];

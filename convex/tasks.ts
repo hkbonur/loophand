@@ -14,12 +14,7 @@ import { assertOwnedTask, assertOwnedProject } from "./lib/ownership";
 import { ensureDefaultProject, findProjectByName } from "./lib/projectHelpers";
 import { assertUploadOwnedBy, attachUploadToTask, reclaimTaskBlobs } from "./files";
 import { storageProxyUrl } from "./lib/r2";
-import {
-  TASK_STATUSES,
-  TASK_OUTCOMES,
-  viewportValidator,
-  toolPayloadValidator,
-} from "./schema";
+import { TASK_STATUSES, TASK_OUTCOMES, viewportValidator, toolPayloadValidator } from "./schema";
 import { isTaskType, TASK_TYPES, RESOLVE_ACTIONS, type ResolveAction } from "./lib/taskConstants";
 import { assertDocItemData } from "./lib/render";
 import {
@@ -734,6 +729,51 @@ export const reopen = mutation({
       userId,
       action: "reopen",
       fromStatus: "awaiting_agent",
+      toStatus: "open",
+      revision: task.revision + 1,
+      createdAt: now,
+    });
+    return null;
+  },
+});
+
+// Move a task back to the Queue (`open`) from any later column — the human's
+// manual override to take a card back for another look, whether the agent has
+// the result (`awaiting_agent`), is working on it (`resumed`), or has closed it
+// (`done`). Distinct from `reopen` (the time-boxed undo of a just-made
+// resolution): requeue carries no recoverability window. It clears the
+// outcome/result and bumps the revision so any in-flight agent resolve can't
+// race the requeue. Dependency cascades already triggered are NOT reversed — a
+// dependent released by the old result keeps running (same caveat as reopen).
+export const requeue = mutation({
+  args: { taskId: v.id("tasks") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const task = await assertOwnedTask(ctx, args.taskId, userId);
+    if (task.status === "open") return null; // already queued — nothing to do
+    if (task.status === "blocked") {
+      // A blocked card is gated on its own dependencies, not on the human. Force
+      // it into the Queue and it would become actionable with deps unmet, so the
+      // path back is clearing the dependency, never this override.
+      throw new ConvexError({
+        code: "CONFLICT",
+        message: "This task is blocked by a dependency — clear that first.",
+      });
+    }
+    const now = Date.now();
+    await ctx.db.patch(args.taskId, {
+      status: "open",
+      outcome: undefined,
+      result: undefined,
+      revision: task.revision + 1,
+      updatedAt: now,
+    });
+    await ctx.db.insert("taskAudit", {
+      taskId: args.taskId,
+      userId,
+      action: "requeue",
+      fromStatus: task.status,
       toStatus: "open",
       revision: task.revision + 1,
       createdAt: now,

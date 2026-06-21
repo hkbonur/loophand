@@ -14,9 +14,11 @@ const comment = (over: Partial<BoardComment>): BoardComment => ({
 });
 
 describe("CommentsSection", () => {
-  test("shows the empty state with no comments", () => {
+  test("shows only the composer with no comments", () => {
     render(<CommentsSection comments={[]} onAdd={() => {}} submitting={false} now={0} />);
-    expect(screen.getByText(/no comments yet/i)).toBeTruthy();
+    expect(screen.getByPlaceholderText(/leave a comment/i)).toBeTruthy();
+    expect(screen.queryByText(/no comments yet/i)).toBeNull();
+    expect(screen.queryByText(/^comments$/i)).toBeNull();
   });
 
   test("renders a comment body", () => {

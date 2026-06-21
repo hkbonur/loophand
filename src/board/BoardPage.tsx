@@ -61,12 +61,6 @@ function BoardInner() {
   const createProject = useMutation(api.projects.create);
   const [activeProjectId, setActiveProjectId] = React.useState<Id<"projects"> | null>(null);
   const [selectedTaskId, setSelectedTaskId] = React.useState<Id<"tasks"> | null>(null);
-  const [now, setNow] = React.useState(() => Date.now());
-
-  React.useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   React.useEffect(() => {
     if (!projects || projects.length === 0) return;
@@ -122,7 +116,13 @@ function BoardInner() {
               },
             },
           });
-          setFocus((current) => moveFocus(columns.map((c) => c.length), current, "down"));
+          setFocus((current) =>
+            moveFocus(
+              columns.map((c) => c.length),
+              current,
+              "down",
+            ),
+          );
         })
         .catch((error) =>
           toast.error(error instanceof Error ? error.message : "Could not approve."),
@@ -162,7 +162,13 @@ function BoardInner() {
         if (focusedTaskId) setSelectedTaskId(focusedTaskId);
         return;
       }
-      setFocus((current) => moveFocus(columns.map((c) => c.length), current, command));
+      setFocus((current) =>
+        moveFocus(
+          columns.map((c) => c.length),
+          current,
+          command,
+        ),
+      );
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -237,8 +243,6 @@ function BoardInner() {
           ) : null}
           <BlockedLane
             tasks={(visibleTasks ?? []).filter((task: TaskView) => task.status === "blocked")}
-            now={now}
-            agents={agents}
             onOpen={setSelectedTaskId}
           />
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -247,8 +251,6 @@ function BoardInner() {
                 key={column.status}
                 column={column}
                 tasks={columns[index]}
-                now={now}
-                agents={agents}
                 loading={tasks === undefined}
                 onOpen={setSelectedTaskId}
                 focusedTaskId={focusedTaskId}

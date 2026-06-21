@@ -45,7 +45,12 @@ export function CardDialog(props: Props) {
   const stale = task && firstStatus.current ? staleNotice(firstStatus.current, task) : null;
 
   return (
-    <Dialog open onClose={props.onClose} title={task?.title} size={fullTakeover ? "screen" : "full"}>
+    <Dialog
+      open
+      onClose={props.onClose}
+      title={task?.title}
+      size={fullTakeover ? "screen" : "full"}
+    >
       {task === undefined ? (
         <div className="flex flex-1 items-center justify-center p-12">
           <Spinner />
@@ -53,7 +58,7 @@ export function CardDialog(props: Props) {
       ) : task === null ? (
         <div className="p-8 text-sm text-muted-foreground">This task is no longer available.</div>
       ) : fullTakeover ? (
-        <ImageStudio task={task} onResolved={props.onClose} onOpenTask={props.onOpenTask} />
+        <ImageStudio task={task} onResolved={props.onClose} />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
           {stale ? <StaleBanner message={stale} /> : null}
@@ -86,10 +91,7 @@ function StaleBanner(props: { message: string }) {
   );
 }
 
-function TaskDetails(props: {
-  task: TaskView;
-  onOpenTask?: (taskId: Id<"tasks">) => void;
-}) {
+function TaskDetails(props: { task: TaskView; onOpenTask?: (taskId: Id<"tasks">) => void }) {
   const task = props.task;
   const agents = useAgents();
   const deps = useQuery(api.deps.forTask, { taskId: task._id });
@@ -155,12 +157,7 @@ function TaskComments(props: { taskId: Id<"tasks"> }) {
 
   if (comments === undefined) return null;
   return (
-    <CommentsSection
-      comments={comments}
-      onAdd={onAdd}
-      submitting={submitting}
-      now={Date.now()}
-    />
+    <CommentsSection comments={comments} onAdd={onAdd} submitting={submitting} now={Date.now()} />
   );
 }
 

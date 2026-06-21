@@ -44,14 +44,21 @@ export interface AnnotationsApi {
   clear: () => void;
 }
 
+// Highest numeric suffix among hydrated mark ids (`m7` → 7), so new marks pick up
+// after a restored draft instead of colliding with it.
+function lastMarkNumber(marks: Mark[]): number {
+  return marks.reduce((max, m) => Math.max(max, Number(m.id.slice(1)) || 0), 0);
+}
+
 // Headless state for the annotation surface: the marks the human has drawn plus
 // the active tool. Geometry comes from the canvas; this owns severity/comment
 // editing, pin numbering, and selection. No canvas or DOM dependency, so the
-// structured-feedback logic is unit-testable on its own.
-export function useAnnotations(): AnnotationsApi {
-  const [marks, setMarks] = React.useState<Mark[]>([]);
+// structured-feedback logic is unit-testable on its own. `initialMarks` rehydrates
+// a persisted draft.
+export function useAnnotations(initialMarks: Mark[] = []): AnnotationsApi {
+  const [marks, setMarks] = React.useState<Mark[]>(initialMarks);
   const [activeTool, setActiveTool] = React.useState<Tool>("box");
-  const nextId = React.useRef(0);
+  const nextId = React.useRef(lastMarkNumber(initialMarks));
 
   const addMark = React.useCallback((input: NewMark): string => {
     const id = `m${++nextId.current}`;
@@ -73,5 +80,14 @@ export function useAnnotations(): AnnotationsApi {
 
   const clear = React.useCallback(() => setMarks([]), []);
 
-  return { marks, activeTool, setActiveTool, addMark, updateComment, setSeverity, removeMark, clear };
+  return {
+    marks,
+    activeTool,
+    setActiveTool,
+    addMark,
+    updateComment,
+    setSeverity,
+    removeMark,
+    clear,
+  };
 }

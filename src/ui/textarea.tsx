@@ -6,6 +6,7 @@ interface Props {
   placeholder?: string;
   rows?: number;
   className?: string;
+  autoFocus?: boolean;
 }
 
 export function Textarea(props: Props) {
@@ -15,6 +16,7 @@ export function Textarea(props: Props) {
       onChange={(event) => props.onChange(event.target.value)}
       placeholder={props.placeholder}
       rows={props.rows ?? 3}
+      autoFocus={props.autoFocus}
       className={cn(
         "w-full resize-y rounded-2xl border border-input bg-muted px-3 py-2 text-sm text-foreground",
         "placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30",

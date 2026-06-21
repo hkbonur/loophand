@@ -1,15 +1,17 @@
 import React from "react";
 import { cn } from "../lib/cn";
 
-type Tone = "neutral" | "info" | "success" | "warning" | "danger";
+export type BadgeTone = "neutral" | "info" | "success" | "warning" | "danger";
 
 interface Props {
-  tone?: Tone;
+  tone?: BadgeTone;
   className?: string;
   children: React.ReactNode;
 }
 
-const TONE_CLASSES: Record<Tone, string> = {
+// Tinted-pill palette per the design system: 15% fill, 30% border, full-strength
+// text. Exported so other status surfaces (e.g. the card StatusPill) share it.
+export const BADGE_TONE: Record<BadgeTone, string> = {
   neutral: "bg-muted text-muted-foreground border-border",
   info: "bg-primary/15 text-primary border-primary/30",
   success: "bg-success/15 text-success border-success/30",
@@ -22,7 +24,7 @@ export function Badge(props: Props) {
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
-        TONE_CLASSES[props.tone ?? "neutral"],
+        BADGE_TONE[props.tone ?? "neutral"],
         props.className,
       )}
     >

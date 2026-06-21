@@ -2,13 +2,10 @@ import React from "react";
 import { LockSimpleIcon, CaretRightIcon } from "@phosphor-icons/react";
 import { cn } from "../lib/cn";
 import { TaskCard } from "./TaskCard";
-import type { AgentDirectory } from "./useAgents";
 import type { TaskView } from "./types";
 
 interface Props {
   tasks: TaskView[];
-  now: number;
-  agents: AgentDirectory;
   onOpen: (taskId: TaskView["_id"]) => void;
 }
 
@@ -38,13 +35,7 @@ export function BlockedLane(props: Props) {
       {open ? (
         <div className="grid grid-cols-1 gap-2 px-3 pb-3 sm:grid-cols-2 xl:grid-cols-4">
           {props.tasks.map((task) => (
-            <TaskCard
-              key={task._id}
-              task={task}
-              now={props.now}
-              agents={props.agents}
-              onOpen={props.onOpen}
-            />
+            <TaskCard key={task._id} task={task} onOpen={props.onOpen} />
           ))}
         </div>
       ) : null}

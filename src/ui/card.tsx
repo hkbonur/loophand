@@ -26,9 +26,11 @@ export function Card(props: Props) {
           : undefined
       }
       className={cn(
-        "rounded-2xl border border-border bg-card p-3 shadow-sm transition duration-200 ease-out",
+        "rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors duration-200 ease-out",
         {
-          "cursor-pointer hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 motion-reduce:transition-none motion-reduce:hover:translate-y-0":
+          // Flat at rest, no lift on hover — the card stays put and answers with
+          // a quiet border + wash instead of rising off the board.
+          "cursor-pointer hover:border-ring/50 hover:bg-muted/60 active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40":
             interactive,
         },
         props.className,

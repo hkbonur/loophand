@@ -1,6 +1,5 @@
-import type { TaskOutcome } from "./types";
-
-type BadgeTone = "neutral" | "info" | "success" | "warning" | "danger";
+import type { BadgeTone } from "../ui/badge";
+import type { TaskOutcome, TaskView } from "./types";
 
 interface OutcomeBadge {
   label: string;
@@ -20,15 +19,44 @@ export function outcomeBadge(outcome: TaskOutcome): OutcomeBadge {
   return OUTCOME_BADGES[outcome];
 }
 
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
+// The leading mark on a card's status pill: a live dot while the task waits on
+// the human, a lock while it's blocked, a glyph (✓ ✎ …) once it has an outcome.
+export type CardStatusLead =
+  | { kind: "pulse" }
+  | { kind: "lock" }
+  | { kind: "glyph"; glyph: string }
+  | null;
 
-// Compact relative age, e.g. "just now", "5m", "3h", "2d".
-export function relativeAge(createdAt: number, now: number): string {
-  const delta = Math.max(0, now - createdAt);
-  if (delta < MINUTE) return "just now";
-  if (delta < HOUR) return `${Math.floor(delta / MINUTE)}m`;
-  if (delta < DAY) return `${Math.floor(delta / HOUR)}h`;
-  return `${Math.floor(delta / DAY)}d`;
+export interface CardStatus {
+  label: string;
+  tone: BadgeTone;
+  lead: CardStatusLead;
+}
+
+// The single state a kanban card leads with. A resolved task speaks through its
+// outcome; an unresolved one through where it sits in the loop.
+export function cardStatus(task: TaskView): CardStatus {
+  if (task.outcome) {
+    const badge = OUTCOME_BADGES[task.outcome];
+    return { label: badge.label, tone: badge.tone, lead: { kind: "glyph", glyph: badge.icon } };
+  }
+  switch (task.status) {
+    case "open":
+      return { label: "In queue", tone: "success", lead: { kind: "pulse" } };
+    case "blocked":
+      return {
+        label:
+          task.depCount > 0
+            ? `${task.depCount} ${task.depCount === 1 ? "dep" : "deps"}`
+            : "Scheduled",
+        tone: "neutral",
+        lead: { kind: "lock" },
+      };
+    case "awaiting_agent":
+      return { label: "Awaiting agent", tone: "neutral", lead: null };
+    case "resumed":
+      return { label: "Agent working", tone: "info", lead: null };
+    case "done":
+      return { label: "Done", tone: "neutral", lead: null };
+  }
 }

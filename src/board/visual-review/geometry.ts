@@ -57,7 +57,60 @@ export function isClick(start: Point, end: Point): boolean {
   return Math.hypot(end.x - start.x, end.y - start.y) < MIN_DRAG;
 }
 
+// Canvas marks carry full-strength status hue (the one place saturated status
+// color is drawn directly, not as a tinted badge). Pulled toward the design
+// system's destructive / warning family so a mark on the canvas matches its
+// severity pill in the comment box.
 export const SEVERITY_COLOR: Record<Severity, string> = {
-  blocker: "#e5484d",
-  nit: "#f5a623",
+  blocker: "#ef4444",
+  nit: "#f59e0b",
 };
+
+// The mark's bounding rectangle in image space. Drives the click target that
+// opens a comment in edit mode (where the Konva canvas itself is pass-through),
+// so the whole marker is clickable, not just the chat bubble.
+export function markBounds(
+  shape: AnnotationShape,
+  points: number[],
+): { x: number; y: number; w: number; h: number } {
+  switch (shape) {
+    case "box":
+      return { x: points[0], y: points[1], w: points[2], h: points[3] };
+    case "arrow": {
+      const [x1, y1, x2, y2] = points;
+      return {
+        x: Math.min(x1, x2),
+        y: Math.min(y1, y2),
+        w: Math.abs(x2 - x1),
+        h: Math.abs(y2 - y1),
+      };
+    }
+    case "pen": {
+      const xs = points.filter((_, i) => i % 2 === 0);
+      const ys = points.filter((_, i) => i % 2 === 1);
+      const x = Math.min(...xs);
+      const y = Math.min(...ys);
+      return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+    }
+    case "pin":
+      return { x: points[0], y: points[1], w: 0, h: 0 };
+  }
+}
+
+// Where a mark's inline comment bubble docks, in image space: the box's
+// top-right, the arrow's head, the pen's last point, the pin's center. Kept
+// here so the canvas overlay and any read-only renderer agree on the anchor.
+export function markAnchor(shape: AnnotationShape, points: number[]): Point {
+  switch (shape) {
+    case "box":
+      return { x: points[0] + points[2], y: points[1] };
+    case "arrow":
+      return { x: points[2], y: points[3] };
+    case "pen": {
+      const n = points.length;
+      return { x: points[n - 2], y: points[n - 1] };
+    }
+    case "pin":
+      return { x: points[0], y: points[1] };
+  }
+}

@@ -1,6 +1,8 @@
 import React from "react";
 import { TrashIcon } from "@phosphor-icons/react";
+import { cn } from "../lib/cn";
 import { Button } from "../ui/button";
+import { menuRowClass } from "./TaskCardMenu";
 
 interface Props {
   taskTitle: string;
@@ -25,18 +27,22 @@ export function ConfirmDeleteTask(props: Props) {
     return (
       <button
         type="button"
+        role="menuitem"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 self-start text-xs text-muted-foreground hover:text-destructive"
+        className={cn(
+          menuRowClass,
+          "text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
+        )}
       >
-        <TrashIcon className="h-3.5 w-3.5" />
+        <TrashIcon className="h-4 w-4" />
         Delete task
       </button>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 p-3">
-      <p className="text-xs text-muted-foreground">
+    <div className="flex flex-col gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-2.5">
+      <p className="text-xs leading-snug text-muted-foreground">
         This permanently deletes the task and its files. Type the title to confirm.
       </p>
       <input

@@ -1,13 +1,10 @@
 import { cn } from "../lib/cn";
 import { TaskCard } from "./TaskCard";
-import type { AgentDirectory } from "./useAgents";
 import type { Column, TaskView } from "./types";
 
 interface Props {
   column: Column;
   tasks: TaskView[];
-  now: number;
-  agents: AgentDirectory;
   loading?: boolean;
   onOpen: (taskId: TaskView["_id"]) => void;
   // The keyboard-focused card in this board, if any (null when elsewhere).
@@ -20,8 +17,10 @@ export function BoardColumn(props: Props) {
     <section className="flex min-w-0 flex-col gap-3 rounded-3xl border border-border bg-muted p-3">
       <header className="flex items-center justify-between px-1">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">{props.column.label}</h3>
-          <p className="text-xs text-muted-foreground">{props.column.hint}</p>
+          <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-foreground">
+            {props.column.label}
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">{props.column.hint}</p>
         </div>
         <span
           className={cn(
@@ -47,8 +46,6 @@ export function BoardColumn(props: Props) {
             <TaskCard
               key={task._id}
               task={task}
-              now={props.now}
-              agents={props.agents}
               onOpen={props.onOpen}
               focused={task._id === props.focusedTaskId}
             />
@@ -61,13 +58,10 @@ export function BoardColumn(props: Props) {
 
 function CardSkeleton() {
   return (
-    <div className="rounded-2xl border border-border bg-card p-3 shadow-sm motion-safe:animate-pulse">
-      <div className="h-3.5 w-3/4 rounded-full bg-muted-foreground/15" />
-      <div className="mt-3 flex gap-1.5">
-        <div className="h-4 w-12 rounded-full bg-muted-foreground/10" />
-        <div className="h-4 w-10 rounded-full bg-muted-foreground/10" />
-      </div>
-      <div className="mt-3 h-3 w-16 rounded-full bg-muted-foreground/10" />
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm motion-safe:animate-pulse">
+      <div className="h-5 w-24 rounded-full bg-muted-foreground/10" />
+      <div className="mt-3 h-4 w-3/4 rounded-full bg-muted-foreground/15" />
+      <div className="mt-4 h-3 w-20 rounded-full bg-muted-foreground/10" />
     </div>
   );
 }

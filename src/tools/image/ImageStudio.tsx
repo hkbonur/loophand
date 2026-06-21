@@ -1,5 +1,5 @@
 import React from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import {
   ArrowClockwiseIcon,
   ArrowCounterClockwiseIcon,
@@ -20,19 +20,20 @@ import {
   ArrowsOutIcon,
   MinusIcon,
   PlusIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  ChatTextIcon,
 } from "@phosphor-icons/react";
 import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "../../lib/cn";
 import { Spinner } from "../../ui/spinner";
+import { Textarea } from "../../ui/textarea";
+import { Tooltip } from "../../ui/tooltip";
+import { Select } from "../../ui/select";
 import { toast } from "../../ui/toaster";
 import type { TaskView } from "../../board/types";
 import type { Tool } from "../../board/visual-review/types";
-import {
-  useAnnotations,
-  marksToAnnotations,
-  pinNumbers,
-} from "../../board/visual-review/useAnnotations";
+import { useAnnotations, marksToAnnotations } from "../../board/visual-review/useAnnotations";
 import {
   applyOp,
   containScale,
@@ -42,11 +43,15 @@ import {
   type ImageOp,
   type OutputType,
 } from "./transforms";
-import { ImageDock } from "./ImageDock";
+import { loadDraft, saveDraft, clearDraft } from "./draft";
+
+import type { EditableApi } from "../../board/visual-review/AnnotationCanvas";
 
 // Konva is heavy + browser-only — load the annotation canvas lazily.
 const AnnotationCanvas = React.lazy(() =>
-  import("../../board/visual-review/AnnotationCanvas").then((m) => ({ default: m.AnnotationCanvas })),
+  import("../../board/visual-review/AnnotationCanvas").then((m) => ({
+    default: m.AnnotationCanvas,
+  })),
 );
 
 const ANNOTATE_VIEWPORT = "desktop" as const;
@@ -54,6 +59,7 @@ const ANNOTATE_WIDTH = 820;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 8;
 const MIN_HANDLE_PX = 24;
+const noop = () => {};
 
 type Mode = "edit" | "annotate";
 type EditTool = "pan" | "crop" | "resize";
@@ -64,7 +70,6 @@ type Box = { left: number; top: number; w: number; h: number };
 interface Props {
   task: TaskView;
   onResolved: () => void;
-  onOpenTask?: (taskId: Id<"tasks">) => void;
 }
 
 interface SourceState {
@@ -118,11 +123,16 @@ function fitScale(viewport: Size, dims: Size | null): number {
 
 // Canvas-first image studio: a theme-surface canvas (white in light, dark in
 // dark) that fits the artifact to the viewport, a summoned floating toolbar, a
-// zoom/pan viewport, draw-a-box crop, drag-handle resize, and an always-visible
-// comment + marks dock. Edit mode applies composable client-side transforms;
-// Annotate mode draws marks that ride back to the agent on request-changes.
+// zoom/pan viewport, draw-a-box crop, and drag-handle resize. Edit mode applies
+// composable client-side transforms; Annotate mode draws marks whose notes are
+// edited inline on the canvas (chat bubbles) and ride back to the agent on
+// request-changes. The overall note attaches via the Approve / Request changes
+// cluster — there's no side panel.
 export function ImageStudio(props: Props) {
   const task = props.task;
+  // Restore any in-progress work for this task (edits, marks, note) once, up
+  // front, so closing the dialog or refreshing the browser never loses it.
+  const draft = React.useMemo(() => loadDraft(task._id), [task._id]);
   const corsUrl = task.screenshotUrl ? `${task.screenshotUrl}?cors=1` : null;
   const source = useSourceImage(corsUrl);
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
@@ -130,9 +140,20 @@ export function ImageStudio(props: Props) {
 
   const [mode, setMode] = React.useState<Mode>("edit");
   const [editTool, setEditTool] = React.useState<EditTool>("pan");
-  const [ops, setOps] = React.useState<ImageOp[]>([]);
+  // Marks ride along on the edit canvas so they don't vanish when you leave
+  // drawing mode — their comment bubbles stay clickable there too; this toggle
+  // hides them when they're in the way.
+  const [showAnnotations, setShowAnnotations] = React.useState(true);
+  const [ops, setOps] = React.useState<ImageOp[]>(draft?.ops ?? []);
+  // The overall note lives here (not inside the resolve cluster) so it persists
+  // with the rest of the draft.
+  const [note, setNote] = React.useState(draft?.note ?? "");
   const [outputType, setOutputType] = React.useState<OutputType>("image/png");
   const [dims, setDims] = React.useState<Size | null>(null);
+  // The bitmap Annotate paints. Snapshotted from the working canvas on entry so
+  // edits (grayscale, crop, rotate) carry into drawing mode; null falls back to
+  // the untouched source.
+  const [annotateSrc, setAnnotateSrc] = React.useState<string | null>(null);
 
   const [viewport, setViewport] = React.useState<Size>({ width: 0, height: 0 });
   const [zoom, setZoom] = React.useState(1);
@@ -153,12 +174,18 @@ export function ImageStudio(props: Props) {
     resetView();
   };
 
-  const ann = useAnnotations();
+  const ann = useAnnotations(draft?.marks);
   const [rawSelectedId, setRawSelectedId] = React.useState<string | null>(null);
   const selectedId = ann.marks.find((m) => m.id === rawSelectedId)?.id ?? null;
-  const pinLabels = pinNumbers(ann.marks);
+  const editable = React.useMemo<EditableApi>(
+    () => ({
+      onUpdateComment: ann.updateComment,
+      onSetSeverity: ann.setSeverity,
+      onRemoveMark: ann.removeMark,
+    }),
+    [ann.updateComment, ann.setSeverity, ann.removeMark],
+  );
 
-  const comments = useQuery(api.tasks.comments, { taskId: task._id });
   const resolve = useMutation(api.tasks.resolve);
   const reopen = useMutation(api.tasks.reopen);
   const [pending, setPending] = React.useState(false);
@@ -195,6 +222,12 @@ export function ImageStudio(props: Props) {
     display.getContext("2d")?.drawImage(cur, 0, 0);
     setDims({ width: w, height: h });
   }, [source.image, ops]);
+
+  // Persist the draft on every change so it survives a dialog close or refresh.
+  // Only resolving (or emptying it) clears the stored copy.
+  React.useEffect(() => {
+    saveDraft(task._id, { ops, marks: ann.marks, note });
+  }, [task._id, ops, ann.marks, note]);
 
   const fit = fitScale(viewport, dims);
   const push = (op: ImageOp) => setOps((cur) => [...cur, op]);
@@ -269,7 +302,17 @@ export function ImageStudio(props: Props) {
     }, outputType);
   };
 
-  const submit = async (action: Action, note: string) => {
+  // Annotate is a static-bitmap surface, so it must paint the *edited* canvas, not
+  // the original source — otherwise the edits vanish the moment you switch to
+  // drawing. Snapshot the working canvas (it's CORS-clean, so toDataURL is safe)
+  // on the way in.
+  const enterAnnotate = () => {
+    const canvas = canvasRef.current;
+    setAnnotateSrc(canvas ? canvas.toDataURL("image/png") : corsUrl);
+    setMode("annotate");
+  };
+
+  const submit = async (action: Action) => {
     const annotations = marksToAnnotations(ann.marks);
     if (action === "request_changes" && annotations.length === 0 && !note.trim()) {
       toast.error("Add a note or an annotation before requesting changes.");
@@ -284,6 +327,8 @@ export function ImageStudio(props: Props) {
         revision: task.revision,
         annotations: annotations.length > 0 ? annotations : undefined,
       });
+      // The work is sent — the draft has served its purpose.
+      clearDraft(task._id);
       toast.success(action === "approve" ? "Approved — sent to the agent." : "Changes requested.", {
         action: {
           label: "Undo",
@@ -302,6 +347,20 @@ export function ImageStudio(props: Props) {
   };
 
   const box = mode === "edit" ? displayBox() : null;
+  // A marks layer floats over the working canvas while editing, so the human
+  // always sees their annotations — and can reopen a comment — without
+  // re-entering drawing mode. Marks live in the artifact's pixel space, so they
+  // stay aligned through any edit that PRESERVES the dimensions (grayscale, flip,
+  // rotate 180). A crop/resize/rotate-90 reshapes the bitmap, so we hide the
+  // overlay rather than paint misplaced marks — undoing the transform brings the
+  // marks right back.
+  const dimsPreserved =
+    !!dims &&
+    !!source.image &&
+    dims.width === source.image.naturalWidth &&
+    dims.height === source.image.naturalHeight;
+  const marksOverlayBox =
+    mode === "edit" && showAnnotations && dimsPreserved && ann.marks.length > 0 ? box : null;
   // Canvas CSS size (before the group's zoom transform). While resizing, zoom is 1
   // and this is the live draft size; otherwise it's the fitted size.
   const canvasSize: Size | null = !dims
@@ -310,14 +369,10 @@ export function ImageStudio(props: Props) {
       ? resizeDraft
       : { width: dims.width * fit, height: dims.height * fit };
 
-  // Annotate paints the source image (its own Konva surface). Fit that to the
-  // viewport too, so switching to Annotate doesn't shrink the artifact.
-  const sourceDims = source.image
-    ? { width: source.image.naturalWidth, height: source.image.naturalHeight }
-    : null;
-  const annotateWidth = sourceDims
-    ? Math.round(sourceDims.width * fitScale(viewport, sourceDims))
-    : ANNOTATE_WIDTH;
+  // Annotate paints the edited bitmap on its own Konva surface. Size it from the
+  // edited dimensions (a crop/resize changes them) and fit to the viewport, so
+  // switching to Annotate doesn't shrink or mis-scale the artifact.
+  const annotateWidth = dims ? Math.round(dims.width * fitScale(viewport, dims)) : ANNOTATE_WIDTH;
 
   return (
     <div className="flex h-full w-full bg-background text-foreground">
@@ -336,24 +391,28 @@ export function ImageStudio(props: Props) {
           onOffset={setOffset}
           onCrop={applyCrop}
           box={box}
+          marksOverlayBox={marksOverlayBox}
           canvasSize={canvasSize}
           onResizeLive={setResizeDraft}
           onResizeCommit={applyResize}
           corsUrl={corsUrl}
+          annotateSrc={annotateSrc}
           annotateWidth={annotateWidth}
           ann={ann}
-          pinLabels={pinLabels}
           selectedId={selectedId}
           onSelectMark={setRawSelectedId}
           onAddMark={(m) => setRawSelectedId(ann.addMark(m))}
+          editable={editable}
         />
 
         <AgentRequestCard instructions={task.instructions} />
 
         <ResolveCluster
           pending={pending}
-          onApprove={() => submit("approve", "")}
-          onRequest={(note) => submit("request_changes", note)}
+          note={note}
+          onNoteChange={setNote}
+          onApprove={() => submit("approve")}
+          onRequest={() => submit("request_changes")}
         />
 
         {mode === "edit" ? (
@@ -379,7 +438,10 @@ export function ImageStudio(props: Props) {
                 onOutputType={setOutputType}
                 onDownload={download}
                 canDownload={!!source.image}
-                onAnnotate={() => setMode("annotate")}
+                onAnnotate={enterAnnotate}
+                showAnnotations={showAnnotations}
+                onToggleAnnotations={() => setShowAnnotations((v) => !v)}
+                markCount={ann.marks.length}
               />
             ) : (
               <AnnotateToolbar
@@ -392,19 +454,6 @@ export function ImageStudio(props: Props) {
           </div>
         </div>
       </div>
-
-      <ImageDock
-        task={task}
-        comments={comments}
-        marks={ann.marks}
-        pinLabels={pinLabels}
-        selectedId={selectedId}
-        onSelectMark={setRawSelectedId}
-        onSetSeverity={ann.setSeverity}
-        onUpdateMarkComment={ann.updateComment}
-        onRemoveMark={ann.removeMark}
-        onOpenTask={props.onOpenTask}
-      />
     </div>
   );
 }
@@ -423,16 +472,18 @@ interface ViewportProps {
   onOffset: (next: { x: number; y: number }) => void;
   onCrop: (local: { x0: number; y0: number; x1: number; y1: number }) => void;
   box: Box | null;
+  marksOverlayBox: Box | null;
   canvasSize: Size | null;
   onResizeLive: (size: Size) => void;
   onResizeCommit: (size: Size) => void;
   corsUrl: string | null;
+  annotateSrc: string | null;
   annotateWidth: number;
   ann: ReturnType<typeof useAnnotations>;
-  pinLabels: Record<string, number>;
   selectedId: string | null;
   onSelectMark: (id: string | null) => void;
   onAddMark: (mark: Parameters<ReturnType<typeof useAnnotations>["addMark"]>[0]) => void;
+  editable: EditableApi;
 }
 
 function CanvasViewport(props: ViewportProps) {
@@ -529,16 +580,49 @@ function CanvasViewport(props: ViewportProps) {
         <div className="absolute inset-0 flex items-center justify-center overflow-auto p-8">
           <React.Suspense fallback={<LoadingArtifact />}>
             <AnnotationCanvas
-              imageUrl={props.corsUrl ?? ""}
+              imageUrl={props.annotateSrc ?? props.corsUrl ?? ""}
               displayWidth={props.annotateWidth}
               upscale
               viewport={ANNOTATE_VIEWPORT}
               marks={props.ann.marks}
-              pinLabels={props.pinLabels}
               activeTool={props.ann.activeTool}
               selectedId={props.selectedId}
               onSelect={props.onSelectMark}
               onAddMark={props.onAddMark}
+              editable={props.editable}
+            />
+          </React.Suspense>
+        </div>
+      ) : null}
+
+      {props.marksOverlayBox ? (
+        <div
+          className="absolute"
+          style={{
+            left: props.marksOverlayBox.left,
+            top: props.marksOverlayBox.top,
+            width: props.marksOverlayBox.w,
+            height: props.marksOverlayBox.h,
+          }}
+        >
+          <React.Suspense fallback={null}>
+            {/* Marks ride along on the working canvas in edit mode. The Konva
+                stage is pass-through (interactiveCanvas=false) so pan/crop/resize
+                still work over the artifact, but the comment bubbles stay live —
+                you can reopen any note without re-entering Annotate. */}
+            <AnnotationCanvas
+              imageUrl={props.corsUrl ?? ""}
+              displayWidth={props.marksOverlayBox.w}
+              upscale
+              hideImage
+              interactiveCanvas={false}
+              viewport={ANNOTATE_VIEWPORT}
+              marks={props.ann.marks}
+              activeTool="select"
+              selectedId={props.selectedId}
+              onSelect={props.onSelectMark}
+              onAddMark={noop}
+              editable={props.editable}
             />
           </React.Suspense>
         </div>
@@ -642,7 +726,12 @@ function ResizeOverlay(props: {
     <>
       <div
         className="pointer-events-none absolute rounded border-2 border-dashed border-primary"
-        style={{ left: props.box.left, top: props.box.top, width: props.box.w, height: props.box.h }}
+        style={{
+          left: props.box.left,
+          top: props.box.top,
+          width: props.box.w,
+          height: props.box.h,
+        }}
       >
         <span className="absolute -top-7 left-0 rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold tabular-nums text-primary-foreground">
           {Math.round(props.box.w / props.fit)}×{Math.round(props.box.h / props.fit)}
@@ -685,7 +774,9 @@ function ErrorArtifact(props: { onRetry: () => void }) {
         <WarningIcon className="h-6 w-6" />
       </span>
       <p className="text-sm text-foreground">Couldn't load the image.</p>
-      <p className="font-mono text-[11px] text-muted-foreground">cross-origin host · check the source</p>
+      <p className="font-mono text-[11px] text-muted-foreground">
+        cross-origin host · check the source
+      </p>
       <button
         type="button"
         onClick={props.onRetry}
@@ -710,23 +801,45 @@ function AgentRequestCard(props: { instructions: string }) {
   );
 }
 
+// The overall note to the agent is its own first-class control (Comment), not a
+// step buried inside Approve. The note is written once and rides along with
+// whichever decision the human lands on; per-mark notes live on the canvas, this
+// is the single message about the whole artifact.
 function ResolveCluster(props: {
   pending: boolean;
+  note: string;
+  onNoteChange: (note: string) => void;
   onApprove: () => void;
-  onRequest: (note: string) => void;
+  onRequest: () => void;
 }) {
-  const [open, setOpen] = React.useState(false);
-  const [note, setNote] = React.useState("");
+  const [noteOpen, setNoteOpen] = React.useState(false);
+  const hasNote = props.note.trim().length > 0;
 
   return (
-    <div className="absolute right-4 top-4 z-20 flex flex-col items-end gap-2">
+    <div className="absolute right-16 top-4 z-20 flex flex-col items-end gap-2">
       <div className="flex items-center gap-2">
         <button
           type="button"
-          disabled={props.pending}
-          onClick={() => setOpen((o) => !o)}
-          className="rounded-full border border-border bg-card/90 px-4 py-2 text-xs font-semibold text-foreground shadow-sm backdrop-blur transition hover:bg-muted disabled:opacity-50"
+          onClick={() => setNoteOpen((o) => !o)}
+          aria-pressed={noteOpen}
+          className={cn(
+            "flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold shadow-sm backdrop-blur transition",
+            noteOpen || hasNote
+              ? "border-primary bg-card text-foreground"
+              : "border-border bg-card/90 text-muted-foreground hover:bg-muted hover:text-foreground",
+          )}
         >
+          <ChatTextIcon className="h-4 w-4" />
+          Comment
+          {hasNote ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+        </button>
+        <button
+          type="button"
+          disabled={props.pending}
+          onClick={props.onRequest}
+          className="flex items-center gap-1.5 rounded-full border border-border bg-card/90 px-4 py-2 text-xs font-semibold text-foreground shadow-sm backdrop-blur transition hover:bg-muted disabled:opacity-50"
+        >
+          {props.pending ? <Spinner /> : null}
           Request changes
         </button>
         <button
@@ -739,32 +852,18 @@ function ResolveCluster(props: {
           Approve
         </button>
       </div>
-      {open ? (
+      {noteOpen ? (
         <div className="w-72 rounded-2xl border border-border bg-card p-3 shadow-xl">
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
+          <Textarea
+            value={props.note}
+            onChange={props.onNoteChange}
             rows={3}
-            placeholder="What should the agent change? (or rely on your marks)"
-            className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+            autoFocus
+            placeholder="A note for the agent about the whole artifact (optional)…"
           />
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="rounded-full px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={props.pending}
-              onClick={() => props.onRequest(note)}
-              className="rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              Send
-            </button>
-          </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            Sent with whichever you choose — Approve or Request changes.
+          </p>
         </div>
       ) : null}
     </div>
@@ -812,27 +911,40 @@ function ToolButton(props: {
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      title={props.label}
-      aria-label={props.label}
-      aria-pressed={props.active}
-      disabled={props.disabled}
-      onClick={props.onClick}
-      className={cn(
-        "flex h-9 w-9 items-center justify-center rounded-xl transition disabled:opacity-40",
-        props.active
-          ? "bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground",
-      )}
-    >
-      {props.children}
-    </button>
+    <Tooltip label={props.label}>
+      <button
+        type="button"
+        aria-label={props.label}
+        aria-pressed={props.active}
+        disabled={props.disabled}
+        onClick={props.onClick}
+        className={cn(
+          "flex h-9 w-9 items-center justify-center rounded-xl transition disabled:opacity-40",
+          props.active
+            ? "bg-primary text-primary-foreground"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        )}
+      >
+        {props.children}
+      </button>
+    </Tooltip>
   );
 }
 
 function Divider() {
   return <span className="mx-1 h-5 w-px flex-none bg-border" />;
+}
+
+// A cluster inside the toolbar: a divider, then its controls. The buttons carry
+// their own tooltips, so the group needs no caption — the divider alone reads as
+// a seam between the edit tools and export.
+function ToolGroup(props: { children: React.ReactNode }) {
+  return (
+    <>
+      <Divider />
+      {props.children}
+    </>
+  );
 }
 
 function Toolbar(props: { children: React.ReactNode }) {
@@ -855,75 +967,98 @@ function EditToolbar(props: {
   onDownload: () => void;
   canDownload: boolean;
   onAnnotate: () => void;
+  showAnnotations: boolean;
+  onToggleAnnotations: () => void;
+  markCount: number;
 }) {
-  const toggle = (tool: EditTool) => () => props.onSetTool(props.editTool === tool ? "pan" : tool);
   return (
     <Toolbar>
-      <ToolButton label="Pan" active={props.editTool === "pan"} onClick={() => props.onSetTool("pan")}>
-        <HandIcon className="h-4 w-4" />
-      </ToolButton>
-      <ToolButton label="Crop — drag a box" active={props.editTool === "crop"} onClick={toggle("crop")}>
-        <CropIcon className="h-4 w-4" />
-      </ToolButton>
-      <ToolButton
-        label="Resize — drag the handles"
-        active={props.editTool === "resize"}
-        onClick={props.editTool === "resize" ? () => props.onSetTool("pan") : props.onStartResize}
-      >
-        <ArrowsOutIcon className="h-4 w-4" />
-      </ToolButton>
-
-      <Divider />
-
-      <ToolButton label="Rotate left" onClick={() => props.onPush({ kind: "rotate", deg: 270 })}>
-        <ArrowCounterClockwiseIcon className="h-4 w-4" />
-      </ToolButton>
-      <ToolButton label="Rotate right" onClick={() => props.onPush({ kind: "rotate", deg: 90 })}>
-        <ArrowClockwiseIcon className="h-4 w-4" />
-      </ToolButton>
-      <ToolButton label="Flip horizontal" onClick={() => props.onPush({ kind: "flip", axis: "h" })}>
-        <FlipHorizontalIcon className="h-4 w-4" />
-      </ToolButton>
-      <ToolButton label="Flip vertical" onClick={() => props.onPush({ kind: "flip", axis: "v" })}>
-        <FlipVerticalIcon className="h-4 w-4" />
-      </ToolButton>
-      <ToolButton label="Grayscale" onClick={() => props.onPush({ kind: "grayscale" })}>
-        <CircleHalfIcon className="h-4 w-4" />
-      </ToolButton>
-      <ToolButton label="Undo last edit" disabled={props.ops.length === 0} onClick={props.onUndo}>
-        <ArrowUUpLeftIcon className="h-4 w-4" />
-      </ToolButton>
-
-      <Divider />
-
-      <span className="flex items-center gap-1.5">
-        <select
-          value={props.outputType}
-          onChange={(e) => props.onOutputType(e.target.value as OutputType)}
-          aria-label="Export format"
-          className="h-9 min-w-[5rem] cursor-pointer rounded-lg border border-border bg-background pl-3 pr-2 text-xs font-medium text-foreground"
-        >
-          {OUTPUT_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {extensionFor(t).toUpperCase()}
-            </option>
-          ))}
-        </select>
-        <ToolButton label="Download" disabled={!props.canDownload} onClick={props.onDownload}>
-          <DownloadSimpleIcon className="h-4 w-4" />
-        </ToolButton>
-      </span>
-
-      <Divider />
-
+      {/* Annotation actions lead the toolbar: add a mark, or toggle the marks
+          already on the artifact. Annotate is a mode switch, not the loudest
+          control on the screen — Approve owns that — so it reads as a quiet
+          secondary, an outlined pill rather than an ink fill. */}
       <button
         type="button"
         onClick={props.onAnnotate}
-        className="flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        className="flex h-9 items-center gap-1.5 rounded-xl border border-border bg-muted/50 px-3 text-xs font-semibold text-foreground transition hover:bg-muted"
       >
         <PencilSimpleIcon className="h-4 w-4" />
         Annotate
       </button>
+      {props.markCount > 0 ? (
+        <button
+          type="button"
+          onClick={props.onToggleAnnotations}
+          aria-pressed={props.showAnnotations}
+          title={props.showAnnotations ? "Hide annotations" : "Show annotations"}
+          className="flex h-9 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        >
+          {props.showAnnotations ? (
+            <EyeSlashIcon className="h-4 w-4" />
+          ) : (
+            <EyeIcon className="h-4 w-4" />
+          )}
+          {props.showAnnotations ? "Hide" : "Show"}
+          <span className="tabular-nums opacity-70">{props.markCount}</span>
+        </button>
+      ) : null}
+
+      <ToolGroup>
+        <ToolButton
+          label="Pan"
+          active={props.editTool === "pan"}
+          onClick={() => props.onSetTool("pan")}
+        >
+          <HandIcon className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton
+          label="Crop — drag a box"
+          active={props.editTool === "crop"}
+          onClick={() => props.onSetTool(props.editTool === "crop" ? "pan" : "crop")}
+        >
+          <CropIcon className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton
+          label="Resize — drag the handles"
+          active={props.editTool === "resize"}
+          onClick={props.editTool === "resize" ? () => props.onSetTool("pan") : props.onStartResize}
+        >
+          <ArrowsOutIcon className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Rotate left" onClick={() => props.onPush({ kind: "rotate", deg: 270 })}>
+          <ArrowCounterClockwiseIcon className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Rotate right" onClick={() => props.onPush({ kind: "rotate", deg: 90 })}>
+          <ArrowClockwiseIcon className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton
+          label="Flip horizontal"
+          onClick={() => props.onPush({ kind: "flip", axis: "h" })}
+        >
+          <FlipHorizontalIcon className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Flip vertical" onClick={() => props.onPush({ kind: "flip", axis: "v" })}>
+          <FlipVerticalIcon className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Grayscale" onClick={() => props.onPush({ kind: "grayscale" })}>
+          <CircleHalfIcon className="h-4 w-4" />
+        </ToolButton>
+        <ToolButton label="Undo last edit" disabled={props.ops.length === 0} onClick={props.onUndo}>
+          <ArrowUUpLeftIcon className="h-4 w-4" />
+        </ToolButton>
+      </ToolGroup>
+
+      <ToolGroup>
+        <Select
+          label="Export format"
+          value={props.outputType}
+          onChange={props.onOutputType}
+          options={OUTPUT_TYPES.map((t) => ({ value: t, label: extensionFor(t).toUpperCase() }))}
+        />
+        <ToolButton label="Download" disabled={!props.canDownload} onClick={props.onDownload}>
+          <DownloadSimpleIcon className="h-4 w-4" />
+        </ToolButton>
+      </ToolGroup>
     </Toolbar>
   );
 }

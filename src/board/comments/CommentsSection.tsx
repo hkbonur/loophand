@@ -1,7 +1,7 @@
 import React from "react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "../../ui/button";
-import { SectionLabel } from "../SectionLabel";
+import { Textarea } from "../../ui/textarea";
 import { commentTimeLabel } from "./commentFormat";
 
 export interface BoardComment {
@@ -31,10 +31,7 @@ export function CommentsSection(props: Props) {
 
   return (
     <div>
-      <SectionLabel>Comments</SectionLabel>
-      {props.comments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No comments yet.</p>
-      ) : (
+      {props.comments.length > 0 ? (
         <ul className="mb-3 flex flex-col gap-2">
           {props.comments.map((comment) => (
             <li key={comment._id} className="rounded-2xl border border-border bg-card px-3 py-2">
@@ -45,12 +42,12 @@ export function CommentsSection(props: Props) {
             </li>
           ))}
         </ul>
-      )}
-      <textarea
+      ) : null}
+      <Textarea
         value={draft}
-        onChange={(event) => setDraft(event.target.value)}
+        onChange={setDraft}
         placeholder="Leave a comment for the agent…"
-        className="min-h-16 w-full rounded-2xl border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+        rows={3}
       />
       <div className="mt-2 flex justify-end">
         <Button size="sm" disabled={!canSend} onClick={send}>

@@ -1,6 +1,16 @@
 import React from "react";
 import { useMutation } from "convex/react";
-import { CheckIcon, XIcon, ProhibitIcon, CursorIcon, SquareIcon, ArrowUpRightIcon, PencilIcon, MapPinIcon, TrashIcon } from "@phosphor-icons/react";
+import {
+  CheckIcon,
+  XIcon,
+  ProhibitIcon,
+  CursorIcon,
+  SquareIcon,
+  ArrowUpRightIcon,
+  PencilIcon,
+  MapPinIcon,
+  TrashIcon,
+} from "@phosphor-icons/react";
 import { api } from "../../../convex/_generated/api";
 import { cn } from "../../lib/cn";
 import { Button } from "../../ui/button";
@@ -8,8 +18,9 @@ import { Textarea } from "../../ui/textarea";
 import { Spinner } from "../../ui/spinner";
 import { toast } from "../../ui/toaster";
 import type { TaskView } from "../types";
-import type { Severity, Tool, Viewport } from "./types";
+import type { Tool, Viewport } from "./types";
 import { useAnnotations, marksToAnnotations, pinNumbers } from "./useAnnotations";
+import { SeverityToggle } from "./SeverityToggle";
 
 // Konva is heavy and browser-only — load the canvas lazily and only on the client.
 const AnnotationCanvas = React.lazy(() =>
@@ -132,13 +143,18 @@ export function VisualReview(props: Props) {
 
       {task.screenshotUrl ? (
         <div className="overflow-auto rounded-2xl border border-border bg-card">
-          <React.Suspense fallback={<div className="p-8 text-center"><Spinner /></div>}>
+          <React.Suspense
+            fallback={
+              <div className="p-8 text-center">
+                <Spinner />
+              </div>
+            }
+          >
             <AnnotationCanvas
               imageUrl={`${task.screenshotUrl}?cors=1`}
               displayWidth={DISPLAY_WIDTH[viewport]}
               viewport={viewport}
               marks={ann.marks}
-              pinLabels={pinLabels}
               activeTool={ann.activeTool}
               selectedId={selectedId}
               onSelect={setRawSelectedId}
@@ -156,8 +172,8 @@ export function VisualReview(props: Props) {
             <li
               key={mark.id}
               className={cn(
-                "rounded-xl border p-2",
-                mark.id === selectedId ? "border-accent" : "border-border",
+                "rounded-xl border p-2 transition-colors",
+                mark.id === selectedId ? "border-primary" : "border-border",
               )}
             >
               <div className="mb-1.5 flex items-center gap-2">
@@ -201,10 +217,18 @@ export function VisualReview(props: Props) {
 
       <div className="flex flex-wrap gap-2">
         <Button disabled={pending !== null} onClick={() => submit("approve")}>
-          {pending === "approve" ? <Spinner className="text-white" /> : <CheckIcon className="h-4 w-4" />}
+          {pending === "approve" ? (
+            <Spinner className="text-white" />
+          ) : (
+            <CheckIcon className="h-4 w-4" />
+          )}
           Approve
         </Button>
-        <Button variant="secondary" disabled={pending !== null} onClick={() => submit("request_changes")}>
+        <Button
+          variant="secondary"
+          disabled={pending !== null}
+          onClick={() => submit("request_changes")}
+        >
           {pending === "request_changes" ? <Spinner /> : <XIcon className="h-4 w-4" />}
           Request changes
         </Button>
@@ -226,20 +250,4 @@ const RESULT_TOAST: Record<Action, string> = {
 function viewportsOf(task: TaskView): Viewport[] {
   const viewports = task.toolPayload?.viewports;
   return viewports && viewports.length > 0 ? viewports : ["desktop"];
-}
-
-function SeverityToggle(props: { value: Severity; onChange: (s: Severity) => void }) {
-  const next: Severity = props.value === "blocker" ? "nit" : "blocker";
-  return (
-    <button
-      type="button"
-      onClick={() => props.onChange(next)}
-      className={cn(
-        "rounded-full px-2 py-0.5 text-xs font-semibold",
-        props.value === "blocker" ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning",
-      )}
-    >
-      {props.value === "blocker" ? "Blocker" : "Nit"}
-    </button>
-  );
 }

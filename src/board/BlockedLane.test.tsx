@@ -3,11 +3,8 @@ import { afterEach, describe, expect, test } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { BlockedLane } from "./BlockedLane";
 import type { TaskView } from "./types";
-import type { AgentDirectory } from "./useAgents";
 
 afterEach(() => cleanup());
-
-const agents: AgentDirectory = new Map();
 
 function blocked(id: string, title: string, depCount: number): TaskView {
   return {
@@ -24,9 +21,7 @@ function blocked(id: string, title: string, depCount: number): TaskView {
 
 describe("BlockedLane", () => {
   test("renders nothing when there are no blocked tasks", () => {
-    const { container } = render(
-      <BlockedLane tasks={[]} now={0} agents={agents} onOpen={() => {}} />,
-    );
+    const { container } = render(<BlockedLane tasks={[]} onOpen={() => {}} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -34,8 +29,6 @@ describe("BlockedLane", () => {
     render(
       <BlockedLane
         tasks={[blocked("a", "First", 1), blocked("b", "Second", 2)]}
-        now={0}
-        agents={agents}
         onOpen={() => {}}
       />,
     );

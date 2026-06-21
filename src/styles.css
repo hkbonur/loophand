@@ -191,3 +191,38 @@ a {
     transform: translateY(0) scale(1);
   }
 }
+
+/* Tooltip fades in only (opacity), so it never fights the positioning transform
+ * that centers it over its trigger. */
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes select-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* The inline comment editor grows from the marker it's anchored to (origin set on
+ * the element). Scale + fade only, no layout properties. */
+@keyframes editor-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

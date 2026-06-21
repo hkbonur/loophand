@@ -15,7 +15,14 @@ describe("pinNumbers", () => {
     const marks: Mark[] = [
       pin("a", "desktop"),
       pin("b", "mobile"),
-      { id: "c", shape: "box", points: [0, 0, 1, 1], viewport: "desktop", severity: "nit", comment: "" },
+      {
+        id: "c",
+        shape: "box",
+        points: [0, 0, 1, 1],
+        viewport: "desktop",
+        severity: "nit",
+        comment: "",
+      },
       pin("d", "desktop"),
     ];
     expect(pinNumbers(marks)).toEqual({ a: 1, d: 2, b: 1 });
@@ -31,14 +38,44 @@ describe("pinNumbers", () => {
 describe("marksToAnnotations", () => {
   test("strips the id and stamps derived pin labels", () => {
     const marks: Mark[] = [
-      { id: "m1", shape: "box", points: [1, 2, 3, 4], viewport: "desktop", severity: "blocker", comment: "x" },
+      {
+        id: "m1",
+        shape: "box",
+        points: [1, 2, 3, 4],
+        viewport: "desktop",
+        severity: "blocker",
+        comment: "x",
+      },
       pin("m2", "desktop"),
       pin("m3", "mobile"),
     ];
     expect(marksToAnnotations(marks)).toEqual([
-      { surface: "screenshot", shape: "box", points: [1, 2, 3, 4], viewport: "desktop", severity: "blocker", comment: "x" },
-      { surface: "screenshot", shape: "pin", points: [0, 0], viewport: "desktop", severity: "blocker", comment: "", label: 1 },
-      { surface: "screenshot", shape: "pin", points: [0, 0], viewport: "mobile", severity: "blocker", comment: "", label: 1 },
+      {
+        surface: "screenshot",
+        shape: "box",
+        points: [1, 2, 3, 4],
+        viewport: "desktop",
+        severity: "blocker",
+        comment: "x",
+      },
+      {
+        surface: "screenshot",
+        shape: "pin",
+        points: [0, 0],
+        viewport: "desktop",
+        severity: "blocker",
+        comment: "",
+        label: 1,
+      },
+      {
+        surface: "screenshot",
+        shape: "pin",
+        points: [0, 0],
+        viewport: "mobile",
+        severity: "blocker",
+        comment: "",
+        label: 1,
+      },
     ]);
   });
 });
@@ -100,5 +137,16 @@ describe("useAnnotations", () => {
     expect(result.current.activeTool).toBe("box");
     act(() => result.current.setActiveTool("pen"));
     expect(result.current.activeTool).toBe("pen");
+  });
+
+  test("hydrates from a draft and keeps new ids past the restored ones", () => {
+    const restored: Mark[] = [pin("m1", "desktop"), pin("m4", "desktop")];
+    const { result } = renderHook(() => useAnnotations(restored));
+    expect(result.current.marks).toHaveLength(2);
+    let id = "";
+    act(() => {
+      id = result.current.addMark({ shape: "pin", points: [9, 9], viewport: "desktop" });
+    });
+    expect(id).toBe("m5"); // continues after the highest restored id, no collision
   });
 });

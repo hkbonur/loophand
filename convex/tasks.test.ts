@@ -227,6 +227,86 @@ describe("tasks.close", () => {
   });
 });
 
+describe("tasks.requeue", () => {
+  test("moves a closed task back to the Queue, clears the result, and audits it", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId } = await setupOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId,
+      tokenId,
+      type: "approval",
+      title: "A",
+      instructions: "A",
+    });
+    await asOwner.mutation(api.tasks.resolve, {
+      taskId: task.task_id,
+      action: "approve",
+      revision: 0,
+    });
+    await t.mutation(internal.tasks.consumeForAgent, { userId, tokenId, taskId: task.task_id });
+    await asOwner.mutation(api.tasks.close, { taskId: task.task_id });
+
+    const before = await t.run((ctx) => ctx.db.get(task.task_id));
+    expect(before?.status).toBe("done");
+
+    await asOwner.mutation(api.tasks.requeue, { taskId: task.task_id });
+
+    const after = await t.run((ctx) => ctx.db.get(task.task_id));
+    expect(after?.status).toBe("open");
+    expect(after?.outcome).toBeUndefined();
+    expect(after?.result).toBeUndefined();
+    expect(after?.revision).toBe((before?.revision ?? 0) + 1);
+
+    const audits = await t.run((ctx) =>
+      ctx.db
+        .query("taskAudit")
+        .withIndex("by_task", (q) => q.eq("taskId", task.task_id))
+        .collect(),
+    );
+    const requeueAudit = audits.find((a) => a.action === "requeue");
+    expect(requeueAudit?.fromStatus).toBe("done");
+    expect(requeueAudit?.toStatus).toBe("open");
+  });
+
+  test("rejects a blocked task — its dependency must be cleared, not bypassed", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId } = await setupOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId,
+      tokenId,
+      type: "approval",
+      title: "A",
+      instructions: "A",
+    });
+    await t.run((ctx) => ctx.db.patch(task.task_id, { status: "blocked" }));
+
+    await expect(asOwner.mutation(api.tasks.requeue, { taskId: task.task_id })).rejects.toThrow();
+  });
+
+  test("is a no-op on a task already in the Queue", async () => {
+    const t = convexTest(schema, modules);
+    const { userId, tokenId } = await setupOwner(t, "owner@example.com");
+    const asOwner = t.withIdentity({ email: "owner@example.com" });
+
+    const { task } = await t.mutation(internal.tasks.createForAgent, {
+      userId,
+      tokenId,
+      type: "approval",
+      title: "A",
+      instructions: "A",
+    });
+    await asOwner.mutation(api.tasks.requeue, { taskId: task.task_id });
+
+    const row = await t.run((ctx) => ctx.db.get(task.task_id));
+    expect(row?.status).toBe("open");
+    expect(row?.revision).toBe(0);
+  });
+});
+
 describe("tasks dependencies (create)", () => {
   async function createDep(
     t: ReturnType<typeof convexTest>,
@@ -571,7 +651,9 @@ describe("tasks.deps view + depCount", () => {
     await setupOwner(t, "stranger@example.com");
     const a = await create(t, owner);
     await expect(
-      t.withIdentity({ email: "stranger@example.com" }).query(api.deps.forTask, { taskId: a.task_id }),
+      t
+        .withIdentity({ email: "stranger@example.com" })
+        .query(api.deps.forTask, { taskId: a.task_id }),
     ).rejects.toThrow();
   });
 
@@ -588,7 +670,10 @@ describe("tasks.deps view + depCount", () => {
 });
 
 describe("tasks.reopen (undo)", () => {
-  async function openTask(t: ReturnType<typeof convexTest>, ids: { userId: Id<"users">; tokenId: Id<"apiTokens">; projectId: Id<"projects"> }) {
+  async function openTask(
+    t: ReturnType<typeof convexTest>,
+    ids: { userId: Id<"users">; tokenId: Id<"apiTokens">; projectId: Id<"projects"> },
+  ) {
     const { task } = await t.mutation(internal.tasks.createForAgent, {
       userId: ids.userId,
       tokenId: ids.tokenId,
